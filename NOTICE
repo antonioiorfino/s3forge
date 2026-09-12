@@ -1,0 +1,11 @@
+S3Forge
+Copyright 2026 Antonio Iorfino
+
+This product includes software developed as an independent,
+clean-room reimplementation of the concept of an embedded S3 mock
+server. It is functionally inspired by findify/s3mock
+(https://github.com/findify/s3mock), which is distributed under the
+MIT License. No source code from that project is included here.
+
+The AWS SDK for Java v2 is used exclusively in the test scope and is
+not redistributed as part of S3Forge.
