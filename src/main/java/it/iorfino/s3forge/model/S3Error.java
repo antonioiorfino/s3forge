@@ -73,6 +73,9 @@ public enum S3Error {
             "The list of parts was not in ascending order. Parts must be ordered by part number.",
             400),
 
+    /** The requested part number is not valid for this object. */
+    INVALID_PART_NUMBER("InvalidPartNumber", "The requested part number is not valid.", 416),
+
     /** Generic malformed request. */
     INVALID_REQUEST("InvalidRequest", "Invalid request.", 400),
 

@@ -3,6 +3,7 @@ package it.iorfino.s3forge.http;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import it.iorfino.s3forge.model.S3Error;
+import it.iorfino.s3forge.store.PartInfo;
 import it.iorfino.s3forge.store.Store;
 import it.iorfino.s3forge.store.StoredObject;
 import it.iorfino.s3forge.util.Etag;
@@ -13,10 +14,7 @@ import java.io.OutputStream;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * HTTP handler for S3 object-level operations.
@@ -189,7 +187,15 @@ public final class ObjectHandler {
 
         try (var data = new ByteArrayInputStream(body)) {
             store.putObject(
-                    bucket, key, data, body.length, contentType, etag, crc32Base64, metadata);
+                    bucket,
+                    key,
+                    data,
+                    body.length,
+                    contentType,
+                    etag,
+                    crc32Base64,
+                    metadata,
+                    List.of());
         }
 
         // 8. Response headers.
@@ -209,8 +215,16 @@ public final class ObjectHandler {
      * Handles a {@code GET /{bucket}/{key}} request, streaming the object payload back to the
      * client.
      *
-     * <p>If the request carries a satisfiable {@code Range} header, the response is {@code 206
-     * Partial Content} with only the requested bytes and a {@code Content-Range} header.
+     * <p>If the {@code partNumber} query parameter is present and the object is multipart, only
+     * that part's bytes are returned as {@code 206 Partial Content}, with {@code Content-Range}
+     * reflecting the part's range within the full object, and {@code x-amz-mp-parts-count} set to
+     * the total part count. The {@code ETag} is always the object's own ETag, not the part's,
+     * matching real S3.
+     *
+     * <p>If a satisfiable {@code Range} header is present, the response is {@code 206 Partial
+     * Content} with only the requested bytes and a {@code Content-Range} header. A syntactically
+     * invalid {@code Range} header is silently ignored and the full body is served, matching HTTP
+     * semantics.
      *
      * <p>Sets {@code Content-Type}, {@code Content-Length}, {@code ETag}, {@code Last-Modified},
      * {@code Accept-Ranges}, any stored metadata headers, and (when available) {@code
@@ -219,9 +233,11 @@ public final class ObjectHandler {
      * @param ex the HTTP exchange
      * @param bucket the bucket name
      * @param key the object key
+     * @param query the parsed query parameters, used to resolve {@code partNumber}
      * @throws IOException on I/O failure
      */
-    public void getObject(HttpExchange ex, String bucket, String key) throws IOException {
+    public void getObject(HttpExchange ex, String bucket, String key, QueryParams query)
+            throws IOException {
         Optional<StoredObject> maybe = store.getObject(bucket, key);
         if (maybe.isEmpty()) {
             ResponseWriter.error(ex, S3Error.NO_SUCH_KEY);
@@ -239,6 +255,52 @@ public final class ObjectHandler {
         }
         writeMetadata(headers, obj.metadata());
 
+        // ---- partNumber handling ----
+        int partNumber = query.getInt("partNumber", -1);
+        if (partNumber > 0) {
+            if (!obj.isMultipart()) {
+                if (partNumber == 1) {
+                    // AWS semantics: partNumber=1 on a single-part object
+                    // returns the whole object as 200 OK.
+                    ex.sendResponseHeaders(200, obj.size());
+                    try (OutputStream os = ex.getResponseBody();
+                            var in = obj.data()) {
+                        in.transferTo(os);
+                    }
+                    return;
+                }
+                ResponseWriter.error(ex, S3Error.INVALID_PART);
+                return;
+            }
+
+            PartInfo part = resolvePart(obj, partNumber);
+            if (part == null) {
+                ResponseWriter.error(ex, S3Error.INVALID_PART_NUMBER);
+                return;
+            }
+
+            headers.set("Content-Range", part.contentRange(obj.size()));
+            headers.set("Content-Length", Long.toString(part.size()));
+            headers.set("x-amz-mp-parts-count", Integer.toString(obj.parts().size()));
+
+            ex.sendResponseHeaders(206, part.size());
+            try (OutputStream os = ex.getResponseBody();
+                    var in = obj.data()) {
+                in.skipNBytes(part.startOffset());
+                byte[] buf = new byte[8192];
+                long remaining = part.size();
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buf.length, remaining);
+                    int n = in.read(buf, 0, toRead);
+                    if (n < 0) break;
+                    os.write(buf, 0, n);
+                    remaining -= n;
+                }
+            }
+            return;
+        }
+
+        // ---- Range handling (esistente) ----
         var rangeOpt = RangeSpec.parse(ex.getRequestHeaders().getFirst("Range"));
 
         if (rangeOpt.isEmpty()) {
@@ -288,15 +350,21 @@ public final class ObjectHandler {
      * Handles a {@code HEAD /{bucket}/{key}} request, returning object metadata without the
      * payload.
      *
+     * <p>If the {@code partNumber} query parameter is present and the object is multipart, the
+     * response carries the part's {@code Content-Range} and {@code Content-Length}, plus {@code
+     * x-amz-mp-parts-count}, but no body. The same {@code ETag} (the object's) is returned.
+     *
      * <p>Sets the same headers as {@link #getObject} but sends no body. Responds with {@code 404}
      * if the key does not exist.
      *
      * @param ex the HTTP exchange
      * @param bucket the bucket name
      * @param key the object key
+     * @param query the parsed query parameters, used to resolve {@code partNumber}
      * @throws IOException on I/O failure
      */
-    public void headObject(HttpExchange ex, String bucket, String key) throws IOException {
+    public void headObject(HttpExchange ex, String bucket, String key, QueryParams query)
+            throws IOException {
         Optional<StoredObject> maybe = store.getObject(bucket, key);
         if (maybe.isEmpty()) {
             ex.sendResponseHeaders(404, -1);
@@ -318,6 +386,36 @@ public final class ObjectHandler {
         }
         writeMetadata(headers, obj.metadata());
 
+        // Resolve partNumber, if present.
+        int partNumber = query.getInt("partNumber", -1);
+        if (partNumber > 0) {
+            if (!obj.isMultipart()) {
+                if (partNumber == 1) {
+                    headers.set("Content-Length", Long.toString(obj.size()));
+                    ex.sendResponseHeaders(200, -1);
+                    ex.close();
+                    return;
+                }
+                ResponseWriter.error(ex, S3Error.INVALID_PART);
+                return;
+            }
+
+            PartInfo part = resolvePart(obj, partNumber);
+            if (part == null) {
+                ResponseWriter.error(ex, S3Error.INVALID_PART_NUMBER);
+                return;
+            }
+
+            headers.set("Content-Range", part.contentRange(obj.size()));
+            headers.set("Content-Length", Long.toString(part.size()));
+            headers.set("x-amz-mp-parts-count", Integer.toString(obj.parts().size()));
+
+            ex.sendResponseHeaders(206, -1);
+            ex.close();
+            return;
+        }
+
+        // ---- Range handling (esistente) ----
         var rangeOpt = RangeSpec.parse(ex.getRequestHeaders().getFirst("Range"));
         if (rangeOpt.isPresent()) {
             var resolved = rangeOpt.get().resolve(obj.size());
@@ -425,7 +523,15 @@ public final class ObjectHandler {
 
         try (var data = src.data()) {
             store.putObject(
-                    bucket, key, data, src.size(), contentType, etag, checksum, destMetadata);
+                    bucket,
+                    key,
+                    data,
+                    src.size(),
+                    contentType,
+                    etag,
+                    checksum,
+                    destMetadata,
+                    src.parts());
         }
 
         Instant now = Instant.now();
@@ -536,6 +642,20 @@ public final class ObjectHandler {
                                     + Character.digit(hex.charAt(i + 1), 16));
         }
         return out;
+    }
+
+    /**
+     * Resolves a part descriptor by part number from a multipart object.
+     *
+     * @param obj the stored object; must be multipart for a non-null result
+     * @param partNumber the 1-based part number
+     * @return the matching {@link PartInfo}, or {@code null} if the object has no such part
+     */
+    private static PartInfo resolvePart(StoredObject obj, int partNumber) {
+        for (PartInfo p : obj.parts()) {
+            if (p.partNumber() == partNumber) return p;
+        }
+        return null;
     }
 
     /**

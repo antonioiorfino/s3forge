@@ -2,6 +2,7 @@ package it.iorfino.s3forge.store;
 
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -27,6 +28,8 @@ import java.util.Map;
  * @param checksumCrc32 Base64-encoded big-endian CRC32 checksum, or empty string if not available;
  *     never {@code null}
  * @param metadata object metadata headers, lowercase keys; never {@code null}, possibly empty
+ * @param parts multipart part descriptors, ordered by part number; never {@code null}, empty for
+ *     single-part objects
  * @param data payload stream, or {@code null} for summaries
  * @since 0.1.0
  */
@@ -39,6 +42,7 @@ public record StoredObject(
         Instant lastModified,
         String checksumCrc32,
         Map<String, String> metadata,
+        List<PartInfo> parts,
         InputStream data) {
     /** Compact constructor applying default values and defensive copies. */
     public StoredObject {
@@ -46,10 +50,27 @@ public record StoredObject(
         if (contentType == null) contentType = "application/octet-stream";
         if (checksumCrc32 == null) checksumCrc32 = "";
         metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+        parts = parts == null ? List.of() : List.copyOf(parts);
+    }
+
+    /**
+     * Returns whether this object was created via a multipart upload.
+     *
+     * <p>An object is considered multipart if at least one part descriptor is present. Single-part
+     * objects uploaded with {@code PutObject} always return {@code false}.
+     *
+     * @return {@code true} if the object was assembled from multiple parts
+     */
+    public boolean isMultipart() {
+        return !parts.isEmpty();
     }
 
     /**
      * Returns a copy of this object without the payload stream, suitable for list responses.
+     *
+     * <p>The returned instance preserves all metadata, including the {@link #metadata} map and the
+     * {@link #parts} list, so that a client which only performed a listing can still inspect them
+     * without a full {@code GET}.
      *
      * @param full the source object; must not be {@code null}
      * @return a summary instance with {@code data == null}
@@ -64,6 +85,7 @@ public record StoredObject(
                 full.lastModified,
                 full.checksumCrc32,
                 full.metadata,
+                full.parts,
                 null);
     }
 }

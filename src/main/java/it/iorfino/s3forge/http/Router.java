@@ -181,8 +181,8 @@ public final class Router implements HttpHandler {
                         objectHandler.putObject(ex, bucket, key);
                     }
                 }
-                case "GET" -> objectHandler.getObject(ex, bucket, key);
-                case "HEAD" -> objectHandler.headObject(ex, bucket, key);
+                case "GET" -> objectHandler.getObject(ex, bucket, key, query);
+                case "HEAD" -> objectHandler.headObject(ex, bucket, key, query);
                 case "DELETE" -> objectHandler.deleteObject(ex, bucket, key);
                 default -> ResponseWriter.error(ex, S3Error.INVALID_REQUEST);
             }

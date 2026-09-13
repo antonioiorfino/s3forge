@@ -38,8 +38,8 @@ DOM parser for XML. No Spring, no Vert.x, no Akka. Just Java.
 | `ListObjects` (v1) | `prefix`, `delimiter`, `marker`, `max-keys` |
 | `ListObjectsV2` | `prefix`, `delimiter`, `continuation-token`, `max-keys` |
 | `PutObject` | `aws-chunked` decoding, CRC32 trailer support, object metadata |
-| `GetObject` | `Range` header support (`206 Partial Content`), metadata headers |
-| `HeadObject` | `Range` header support, metadata headers |
+| `GetObject` | `Range` header, `partNumber` for multipart objects, metadata headers |
+| `HeadObject` | `Range` header, `partNumber` for multipart objects, metadata headers |
 | `DeleteObject` | idempotent |
 | `DeleteObjects` | batch, `Quiet` mode, 1000-key limit |
 | `CopyObject` | `COPY` and `REPLACE` metadata directives |

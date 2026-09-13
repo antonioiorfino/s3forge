@@ -13,6 +13,15 @@ and this project adheres to Semantic Versioning (https://semver.org/).
   `GetObject`, `HeadObject`, and `CopyObject`: `Cache-Control`,
   `Content-Disposition`, `Content-Encoding`, `Content-Language`,
   `Expires`, and user-defined `x-amz-meta-*` entries (#5).
+- `GetObject` and `HeadObject` support the `partNumber` query
+  parameter for multipart objects, with `Content-Range` and
+  `x-amz-mp-parts-count` headers, and S3-compatible error codes for
+  out-of-range parts (#6).
+
+### Removed
+
+- Dead duplicate `AwsChunkedDecoder` in the `http` package; the
+  canonical implementation lives in `util`.
 
 ## [0.1.0] - 2026-09-13
 
