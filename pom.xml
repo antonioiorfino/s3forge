@@ -45,7 +45,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <junit.version>6.1.3</junit.version>
-        <awssdk.version>2.54.13</awssdk.version>
+        <awssdk.version>2.54.15</awssdk.version>
     </properties>
 
     <dependencyManagement>
