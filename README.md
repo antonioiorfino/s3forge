@@ -1,7 +1,7 @@
 # S3Forge
 
 [![CI](https://github.com/antonioiorfino/s3forge/actions/workflows/ci.yml/badge.svg)](https://github.com/antonioiorfino/s3forge/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/antonioiorfino/s3forge/releases/tag/v0.1.0)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/antonioiorfino/s3forge/releases/tag/v0.2.0)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
 
@@ -81,7 +81,7 @@ Then declare it as a test dependency in your project:
     <dependency>
         <groupId>it.iorfino</groupId>
         <artifactId>s3forge</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0</version>
         <scope>test</scope>
     </dependency>
 
@@ -235,6 +235,11 @@ and stores the extracted checksum alongside the object, so subsequent
 `GET` and `HEAD` responses carry the correct `x-amz-checksum-crc32`.
 
 ## Project status
+
+**0.2.0** — second public release. Adds object metadata support and
+multipart part retrieval. The API surface is stable for the supported
+operations, but the project has not yet reached 1.0, so minor versions
+may introduce breaking changes.
 
 **0.1.0** — first public release. The API surface is stable for the
 operations listed above, but the project has not yet reached a 1.0
