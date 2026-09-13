@@ -7,24 +7,22 @@ import java.util.regex.Pattern;
 /**
  * Parsed representation of a single HTTP {@code Range} specification.
  *
- * <p>Only the {@code bytes} unit is supported, which is the only unit used by
- * S3. Multi-range requests ({@code bytes=0-9,20-29}) are reduced to the first
- * range; this is documented as a limitation of S3Forge.</p>
+ * <p>Only the {@code bytes} unit is supported, which is the only unit used by S3. Multi-range
+ * requests ({@code bytes=0-9,20-29}) are reduced to the first range; this is documented as a
+ * limitation of S3Forge.
  *
- * <p>A {@link RangeSpec} is <em>resolved</em> against a total length using
- * {@link #resolve(long)} to obtain concrete byte offsets. This separation
- * allows the same spec to be applied to a body whose size is only known at
- * read time.</p>
+ * <p>A {@link RangeSpec} is <em>resolved</em> against a total length using {@link #resolve(long)}
+ * to obtain concrete byte offsets. This separation allows the same spec to be applied to a body
+ * whose size is only known at read time.
  *
  * @since 0.1.0
  */
 public final class RangeSpec {
 
-    private static final Pattern RANGE_PATTERN =
-        Pattern.compile("bytes=(\\d*)-(\\d*)");
+    private static final Pattern RANGE_PATTERN = Pattern.compile("bytes=(\\d*)-(\\d*)");
 
     private final Long start; // null means "from end" (suffix range)
-    private final Long end;   // null means "to end"
+    private final Long end; // null means "to end"
 
     private RangeSpec(Long start, Long end) {
         this.start = start;
@@ -35,10 +33,9 @@ public final class RangeSpec {
      * Parses the value of an HTTP {@code Range} header.
      *
      * @param header the raw header value; may be {@code null}
-     * @return an {@link Optional} containing the parsed spec, or
-     *         {@link Optional#empty()} if the header is missing, uses an
-     *         unsupported unit, or is syntactically invalid. Callers should
-     *         treat an empty result as "serve the full body".
+     * @return an {@link Optional} containing the parsed spec, or {@link Optional#empty()} if the
+     *     header is missing, uses an unsupported unit, or is syntactically invalid. Callers should
+     *     treat an empty result as "serve the full body".
      */
     public static Optional<RangeSpec> parse(String header) {
         if (header == null || header.isEmpty()) return Optional.empty();
@@ -73,10 +70,9 @@ public final class RangeSpec {
      * Resolves this spec against a total body length.
      *
      * @param totalLength the total size of the object in bytes
-     * @return a {@link Resolved} instance with concrete offsets, or
-     *         {@link Optional#empty()} if the range cannot be satisfied
-     *         (e.g. {@code start >= totalLength} or a zero-length suffix on an
-     *         empty body)
+     * @return a {@link Resolved} instance with concrete offsets, or {@link Optional#empty()} if the
+     *     range cannot be satisfied (e.g. {@code start >= totalLength} or a zero-length suffix on
+     *     an empty body)
      */
     public Optional<Resolved> resolve(long totalLength) {
         if (totalLength < 0) return Optional.empty();
@@ -97,21 +93,18 @@ public final class RangeSpec {
         } else {
             resolvedStart = start;
             if (resolvedStart >= totalLength) return Optional.empty();
-            resolvedEnd = (end == null || end >= totalLength)
-                ? totalLength - 1
-                : end;
+            resolvedEnd = (end == null || end >= totalLength) ? totalLength - 1 : end;
         }
 
         return Optional.of(new Resolved(resolvedStart, resolvedEnd, totalLength));
     }
 
     /**
-     * Concrete byte offsets obtained by resolving a {@link RangeSpec} against
-     * a known total length.
+     * Concrete byte offsets obtained by resolving a {@link RangeSpec} against a known total length.
      *
-     * @param start  first byte offset, inclusive
-     * @param end    last byte offset, inclusive
-     * @param total  total length of the object
+     * @param start first byte offset, inclusive
+     * @param end last byte offset, inclusive
+     * @param total total length of the object
      * @since 0.1.0
      */
     public record Resolved(long start, long end, long total) {

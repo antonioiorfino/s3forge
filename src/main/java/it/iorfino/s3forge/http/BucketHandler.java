@@ -7,7 +7,6 @@ import it.iorfino.s3forge.store.Store;
 import it.iorfino.s3forge.store.StoredObject;
 import it.iorfino.s3forge.xml.XmlEscaper;
 import it.iorfino.s3forge.xml.XmlWriter;
-
 import java.io.IOException;
 import java.util.List;
 
@@ -22,10 +21,7 @@ public final class BucketHandler {
     // GET /
     public void listBuckets(HttpExchange ex) throws IOException {
         List<String> buckets = store.listBuckets();
-        XmlWriter w = new XmlWriter()
-            .header()
-            .open("ListAllMyBucketsResult")
-            .open("Buckets");
+        XmlWriter w = new XmlWriter().header().open("ListAllMyBucketsResult").open("Buckets");
         for (String b : buckets) {
             w.open("Bucket").element("Name", b).close("Bucket");
         }
@@ -77,27 +73,26 @@ public final class BucketHandler {
     }
 
     /**
-     * Handles a {@code GET /{bucket}} request, producing a v1
-     * ({@code ListObjects}) or v2 ({@code ListObjectsV2}) response depending
-     * on the {@code list-type} query parameter.
+     * Handles a {@code GET /{bucket}} request, producing a v1 ({@code ListObjects}) or v2 ({@code
+     * ListObjectsV2}) response depending on the {@code list-type} query parameter.
      *
-     * <p>Supported query parameters:</p>
+     * <p>Supported query parameters:
+     *
      * <ul>
-     *   <li>{@code list-type=2} — selects the v2 response schema</li>
-     *   <li>{@code prefix} — filter by key prefix</li>
-     *   <li>{@code delimiter} — group keys by common prefixes</li>
-     *   <li>{@code max-keys} — maximum entries per page</li>
-     *   <li>{@code marker} — v1 pagination cursor</li>
-     *   <li>{@code continuation-token} — v2 pagination cursor</li>
+     *   <li>{@code list-type=2} — selects the v2 response schema
+     *   <li>{@code prefix} — filter by key prefix
+     *   <li>{@code delimiter} — group keys by common prefixes
+     *   <li>{@code max-keys} — maximum entries per page
+     *   <li>{@code marker} — v1 pagination cursor
+     *   <li>{@code continuation-token} — v2 pagination cursor
      * </ul>
      *
-     * @param ex     the HTTP exchange
+     * @param ex the HTTP exchange
      * @param bucket the bucket name
-     * @param query  the parsed query parameters
+     * @param query the parsed query parameters
      * @throws IOException on I/O failure
      */
-    public void listObjects(HttpExchange ex, String bucket, QueryParams query)
-        throws IOException {
+    public void listObjects(HttpExchange ex, String bucket, QueryParams query) throws IOException {
         if (!store.bucketExists(bucket)) {
             ResponseWriter.error(ex, S3Error.NO_SUCH_BUCKET);
             return;
@@ -111,31 +106,40 @@ public final class BucketHandler {
         String marker = v2 ? null : query.get("marker");
         String continuationToken = v2 ? query.get("continuation-token") : null;
 
-        ListResult result = store.listObjects(bucket, prefix, delimiter,
-            maxKeys, marker, continuationToken);
+        ListResult result =
+                store.listObjects(bucket, prefix, delimiter, maxKeys, marker, continuationToken);
 
-        String body = v2
-            ? renderV2(bucket, prefix, delimiter, maxKeys, result,
-            query.get("continuation-token"))
-            : renderV1(bucket, prefix, delimiter, maxKeys, result,
-            query.get("marker"));
+        String body =
+                v2
+                        ? renderV2(
+                                bucket,
+                                prefix,
+                                delimiter,
+                                maxKeys,
+                                result,
+                                query.get("continuation-token"))
+                        : renderV1(bucket, prefix, delimiter, maxKeys, result, query.get("marker"));
 
         ResponseWriter.xml(ex, 200, body);
     }
 
-    /**
-     * Renders a {@code ListObjects} (v1) XML response.
-     */
-    private static String renderV1(String bucket, String prefix, String delimiter,
-                                   int maxKeys, ListResult result, String marker) {
-        XmlWriter w = new XmlWriter()
-            .header()
-            .open("ListBucketResult")
-            .element("Name", bucket)
-            .element("Prefix", prefix == null ? "" : prefix)
-            .element("Marker", marker == null ? "" : marker)
-            .element("MaxKeys", maxKeys)
-            .element("IsTruncated", Boolean.toString(result.truncated()));
+    /** Renders a {@code ListObjects} (v1) XML response. */
+    private static String renderV1(
+            String bucket,
+            String prefix,
+            String delimiter,
+            int maxKeys,
+            ListResult result,
+            String marker) {
+        XmlWriter w =
+                new XmlWriter()
+                        .header()
+                        .open("ListBucketResult")
+                        .element("Name", bucket)
+                        .element("Prefix", prefix == null ? "" : prefix)
+                        .element("Marker", marker == null ? "" : marker)
+                        .element("MaxKeys", maxKeys)
+                        .element("IsTruncated", Boolean.toString(result.truncated()));
 
         if (result.truncated() && result.nextMarker() != null) {
             w.element("NextMarker", result.nextMarker());
@@ -146,12 +150,12 @@ public final class BucketHandler {
 
         for (StoredObject o : result.objects()) {
             w.open("Contents")
-                .element("Key", o.key())
-                .element("LastModified", o.lastModified().toString())
-                .element("ETag", "\"" + o.etag() + "\"")
-                .element("Size", o.size())
-                .element("StorageClass", "STANDARD")
-                .close("Contents");
+                    .element("Key", o.key())
+                    .element("LastModified", o.lastModified().toString())
+                    .element("ETag", "\"" + o.etag() + "\"")
+                    .element("Size", o.size())
+                    .element("StorageClass", "STANDARD")
+                    .close("Contents");
         }
         for (String cp : result.commonPrefixes()) {
             w.open("CommonPrefixes").element("Prefix", cp).close("CommonPrefixes");
@@ -160,20 +164,25 @@ public final class BucketHandler {
         return w.toString();
     }
 
-    /**
-     * Renders a {@code ListObjectsV2} XML response.
-     */
-    private static String renderV2(String bucket, String prefix, String delimiter,
-                                   int maxKeys, ListResult result,
-                                   String continuationToken) {
-        XmlWriter w = new XmlWriter()
-            .header()
-            .open("ListBucketResult")
-            .element("Name", bucket)
-            .element("Prefix", prefix == null ? "" : prefix)
-            .element("KeyCount", result.objects().size() + result.commonPrefixes().size())
-            .element("MaxKeys", maxKeys)
-            .element("IsTruncated", Boolean.toString(result.truncated()));
+    /** Renders a {@code ListObjectsV2} XML response. */
+    private static String renderV2(
+            String bucket,
+            String prefix,
+            String delimiter,
+            int maxKeys,
+            ListResult result,
+            String continuationToken) {
+        XmlWriter w =
+                new XmlWriter()
+                        .header()
+                        .open("ListBucketResult")
+                        .element("Name", bucket)
+                        .element("Prefix", prefix == null ? "" : prefix)
+                        .element(
+                                "KeyCount",
+                                result.objects().size() + result.commonPrefixes().size())
+                        .element("MaxKeys", maxKeys)
+                        .element("IsTruncated", Boolean.toString(result.truncated()));
 
         if (result.truncated() && result.nextContinuationToken() != null) {
             w.element("NextContinuationToken", result.nextContinuationToken());
@@ -187,12 +196,12 @@ public final class BucketHandler {
 
         for (StoredObject o : result.objects()) {
             w.open("Contents")
-                .element("Key", o.key())
-                .element("LastModified", o.lastModified().toString())
-                .element("ETag", "\"" + o.etag() + "\"")
-                .element("Size", o.size())
-                .element("StorageClass", "STANDARD")
-                .close("Contents");
+                    .element("Key", o.key())
+                    .element("LastModified", o.lastModified().toString())
+                    .element("ETag", "\"" + o.etag() + "\"")
+                    .element("Size", o.size())
+                    .element("StorageClass", "STANDARD")
+                    .close("Contents");
         }
         for (String cp : result.commonPrefixes()) {
             w.open("CommonPrefixes").element("Prefix", cp).close("CommonPrefixes");
@@ -210,28 +219,28 @@ public final class BucketHandler {
     /**
      * Handles a {@code GET /{bucket}?location} request.
      *
-     * <p>Returns a {@code LocationConstraint} XML document. When no region
-     * is configured, the constraint is an empty string, which all S3 clients
-     * treat as {@code us-east-1}, matching AWS behavior for the default
-     * region.</p>
+     * <p>Returns a {@code LocationConstraint} XML document. When no region is configured, the
+     * constraint is an empty string, which all S3 clients treat as {@code us-east-1}, matching AWS
+     * behavior for the default region.
      *
-     * @param ex     the HTTP exchange
+     * @param ex the HTTP exchange
      * @param bucket the bucket name
      * @param region the configured region, or {@code null} for default
      * @throws IOException on I/O failure
      */
     public void getBucketLocation(HttpExchange ex, String bucket, String region)
-        throws IOException {
+            throws IOException {
         if (!store.bucketExists(bucket)) {
             ResponseWriter.error(ex, S3Error.NO_SUCH_BUCKET);
             return;
         }
-        String body = new XmlWriter()
-            .header()
-            .open("LocationConstraint")
-            .raw(XmlEscaper.escape(region == null ? "" : region))
-            .close("LocationConstraint")
-            .toString();
+        String body =
+                new XmlWriter()
+                        .header()
+                        .open("LocationConstraint")
+                        .raw(XmlEscaper.escape(region == null ? "" : region))
+                        .close("LocationConstraint")
+                        .toString();
         ResponseWriter.xml(ex, 200, body);
     }
 }

@@ -1,6 +1,11 @@
 package it.iorfino.s3forge;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import it.iorfino.s3forge.support.AwsClientFactory;
+import java.io.IOException;
+import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -11,13 +16,6 @@ import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
-
-import java.io.IOException;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BucketOperationsTest {
 
@@ -59,8 +57,9 @@ class BucketOperationsTest {
     void deleteBucketRemovesIt() {
         client.createBucket(CreateBucketRequest.builder().bucket("to-delete").build());
         client.deleteBucket(DeleteBucketRequest.builder().bucket("to-delete").build());
-        assertThrows(NoSuchBucketException.class,
-            () -> client.headBucket(HeadBucketRequest.builder().bucket("to-delete").build()));
+        assertThrows(
+                NoSuchBucketException.class,
+                () -> client.headBucket(HeadBucketRequest.builder().bucket("to-delete").build()));
     }
 
     @Test
@@ -72,8 +71,10 @@ class BucketOperationsTest {
 
     @Test
     void deleteNonExistingBucketFails() {
-        assertThrows(NoSuchBucketException.class,
-            () -> client.deleteBucket(DeleteBucketRequest.builder()
-                .bucket("does-not-exist").build()));
+        assertThrows(
+                NoSuchBucketException.class,
+                () ->
+                        client.deleteBucket(
+                                DeleteBucketRequest.builder().bucket("does-not-exist").build()));
     }
 }

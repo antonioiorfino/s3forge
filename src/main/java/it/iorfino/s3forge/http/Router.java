@@ -5,7 +5,6 @@ import com.sun.net.httpserver.HttpHandler;
 import it.iorfino.s3forge.config.S3ForgeConfig;
 import it.iorfino.s3forge.model.S3Error;
 import it.iorfino.s3forge.store.Store;
-
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -16,19 +15,20 @@ import java.util.Optional;
 /**
  * Central HTTP dispatcher for S3Forge.
  *
- * <p>Parses the request path (path-style addressing) or the {@code Host}
- * header (virtual-host style addressing, when enabled), then dispatches to
- * the appropriate handler based on the HTTP method and query parameters.</p>
+ * <p>Parses the request path (path-style addressing) or the {@code Host} header (virtual-host style
+ * addressing, when enabled), then dispatches to the appropriate handler based on the HTTP method
+ * and query parameters.
  *
- * <p>Path grammar in path-style mode:</p>
+ * <p>Path grammar in path-style mode:
+ *
  * <ul>
- *   <li>{@code /}                    → service-level operations</li>
- *   <li>{@code /{bucket}}            → bucket-level operations</li>
- *   <li>{@code /{bucket}/{key...}}   → object-level operations</li>
+ *   <li>{@code /} → service-level operations
+ *   <li>{@code /{bucket}} → bucket-level operations
+ *   <li>{@code /{bucket}/{key...}} → object-level operations
  * </ul>
  *
- * <p>In virtual-host mode, {@code /{key...}} is interpreted as an object
- * path inside the bucket derived from the {@code Host} header.</p>
+ * <p>In virtual-host mode, {@code /{key...}} is interpreted as an object path inside the bucket
+ * derived from the {@code Host} header.
  *
  * @since 0.1.0
  */
@@ -44,30 +44,28 @@ public final class Router implements HttpHandler {
     /**
      * Creates a new router.
      *
-     * @param store  the storage backend; must not be {@code null}
-     * @param config the server configuration, used to enable virtual-host
-     *               addressing and to provide the region for
-     *               {@code GetBucketLocation}; must not be {@code null}
+     * @param store the storage backend; must not be {@code null}
+     * @param config the server configuration, used to enable virtual-host addressing and to provide
+     *     the region for {@code GetBucketLocation}; must not be {@code null}
      */
     public Router(Store store, S3ForgeConfig config) {
         this.config = config;
         this.bucketHandler = new BucketHandler(store);
         this.objectHandler = new ObjectHandler(store);
         this.deleteObjectsHandler = new DeleteObjectsHandler(store);
-        this.multipartHandler = store instanceof it.iorfino.s3forge.store.MultipartStore
-            ? new MultipartHandler(store)
-            : null;
-        this.virtualHostResolver = config.virtualHostDomainOpt()
-            .map(VirtualHostResolver::new)
-            .orElse(null);
+        this.multipartHandler =
+                store instanceof it.iorfino.s3forge.store.MultipartStore
+                        ? new MultipartHandler(store)
+                        : null;
+        this.virtualHostResolver =
+                config.virtualHostDomainOpt().map(VirtualHostResolver::new).orElse(null);
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Any exception thrown while handling a request is mapped to a
-     * {@code 500 InternalError} response, unless the response has already
-     * been committed.</p>
+     * <p>Any exception thrown while handling a request is mapped to a {@code 500 InternalError}
+     * response, unless the response has already been committed.
      */
     @Override
     public void handle(HttpExchange ex) throws IOException {
@@ -78,9 +76,10 @@ public final class Router implements HttpHandler {
 
             // ---- Virtual-host resolution --------------------------------
             String host = ex.getRequestHeaders().getFirst("Host");
-            Optional<String> vhostBucket = virtualHostResolver == null
-                ? Optional.empty()
-                : virtualHostResolver.bucketFromHost(host);
+            Optional<String> vhostBucket =
+                    virtualHostResolver == null
+                            ? Optional.empty()
+                            : virtualHostResolver.bucketFromHost(host);
 
             String bucket;
             String key = null;
@@ -112,20 +111,19 @@ public final class Router implements HttpHandler {
             // ---- Bucket-only request (no key) ---------------------------
             if (key == null) {
                 switch (method) {
-                    case "PUT"    -> bucketHandler.createBucket(ex, bucket);
-                    case "GET"    -> {
+                    case "PUT" -> bucketHandler.createBucket(ex, bucket);
+                    case "GET" -> {
                         if (query.contains("uploads") && multipartHandler != null) {
                             multipartHandler.listUploads(ex, bucket);
                         } else if (query.contains("location")) {
-                            bucketHandler.getBucketLocation(ex, bucket,
-                                config.region());
+                            bucketHandler.getBucketLocation(ex, bucket, config.region());
                         } else {
                             bucketHandler.listObjects(ex, bucket, query);
                         }
                     }
                     case "DELETE" -> bucketHandler.deleteBucket(ex, bucket);
-                    case "HEAD"   -> bucketHandler.headBucket(ex, bucket);
-                    case "POST"   -> {
+                    case "HEAD" -> bucketHandler.headBucket(ex, bucket);
+                    case "POST" -> {
                         if (query.contains("delete")) {
                             deleteObjectsHandler.handle(ex, bucket);
                         } else {
@@ -157,8 +155,7 @@ public final class Router implements HttpHandler {
                 }
                 if ("PUT".equals(method) && hasUploadId && hasPartNumber) {
                     int partNumber = query.getInt("partNumber", -1);
-                    multipartHandler.uploadPart(ex, bucket, key, partNumber,
-                        query.get("uploadId"));
+                    multipartHandler.uploadPart(ex, bucket, key, partNumber, query.get("uploadId"));
                     return;
                 }
                 if ("POST".equals(method) && hasUploadId) {
@@ -184,10 +181,10 @@ public final class Router implements HttpHandler {
                         objectHandler.putObject(ex, bucket, key);
                     }
                 }
-                case "GET"    -> objectHandler.getObject(ex, bucket, key);
-                case "HEAD"   -> objectHandler.headObject(ex, bucket, key);
+                case "GET" -> objectHandler.getObject(ex, bucket, key);
+                case "HEAD" -> objectHandler.headObject(ex, bucket, key);
                 case "DELETE" -> objectHandler.deleteObject(ex, bucket, key);
-                default       -> ResponseWriter.error(ex, S3Error.INVALID_REQUEST);
+                default -> ResponseWriter.error(ex, S3Error.INVALID_REQUEST);
             }
         } catch (Exception e) {
             try {
@@ -208,15 +205,15 @@ public final class Router implements HttpHandler {
         if (path == null || path.isEmpty() || "/".equals(path)) return List.of();
         String stripped = path.startsWith("/") ? path.substring(1) : path;
         return Arrays.stream(stripped.split("/", -1))
-            .filter(s -> !s.isEmpty())
-            .map(Router::decode)
-            .toList();
+                .filter(s -> !s.isEmpty())
+                .map(Router::decode)
+                .toList();
     }
 
     /**
      * Extracts the object key from the request path, preserving slashes.
      *
-     * @param path   the raw request path
+     * @param path the raw request path
      * @param bucket the already-parsed bucket name (first segment)
      * @return the decoded key, without leading slash
      */

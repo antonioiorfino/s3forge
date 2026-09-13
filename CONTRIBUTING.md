@@ -28,7 +28,7 @@ Individual test classes:
 
 ## Coding conventions
 
-- **Java 21** features are welcome: records, sealed types, pattern
+- **Java** features are welcome: records, sealed types, pattern
   matching, virtual threads, text blocks.
 - **Javadoc in English**, on every public class and method. Class-level
   Javadoc should explain *why* the class exists, not just *what* it does.
@@ -41,7 +41,7 @@ Individual test classes:
 
 ## Project layout
 
-    src/main/java/io/github/s3forge/
+    src/main/java/it/iorfino/s3forge/
     ├── S3Forge.java              public entry point
     ├── S3ForgeServer.java        HTTP server wrapper
     ├── cli/Main.java             command-line launcher

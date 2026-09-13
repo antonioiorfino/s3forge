@@ -1,5 +1,13 @@
 package it.iorfino.s3forge;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
@@ -13,29 +21,16 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
  * End-to-end tests for virtual-host style addressing.
  *
- * <p>Instead of using the AWS SDK (which would require DNS configuration for
- * {@code <bucket>.localhost}), these tests exercise the HTTP layer directly
- * with the JDK {@link HttpClient}. This is sufficient to verify that the
- * server correctly extracts the bucket name from the {@code Host} header and
- * routes requests accordingly.</p>
+ * <p>Instead of using the AWS SDK (which would require DNS configuration for {@code
+ * <bucket>.localhost}), these tests exercise the HTTP layer directly with the JDK {@link
+ * HttpClient}. This is sufficient to verify that the server correctly extracts the bucket name from
+ * the {@code Host} header and routes requests accordingly.
  *
- * <p>The tests assume that {@code *.localhost} resolves to the loopback
- * address, as mandated by RFC 6761. This holds on Linux and macOS out of the
- * box, and on Windows 10+ in most configurations.</p>
+ * <p>The tests assume that {@code *.localhost} resolves to the loopback address, as mandated by RFC
+ * 6761. This holds on Linux and macOS out of the box, and on Windows 10+ in most configurations.
  *
  * @since 0.1.0
  */
@@ -47,11 +42,7 @@ class VirtualHostTest {
 
     @BeforeAll
     static void setup() throws IOException {
-        forge = S3Forge.builder()
-            .port(0)
-            .inMemory()
-            .virtualHostDomain("localhost")
-            .build();
+        forge = S3Forge.builder().port(0).inMemory().virtualHostDomain("localhost").build();
         forge.start();
         port = forge.port();
         http = HttpClients.createDefault();
@@ -62,8 +53,8 @@ class VirtualHostTest {
         if (forge != null) forge.close();
     }
 
-    private HttpResponse<String> send(String method, String host, String path,
-                                      String body) throws Exception {
+    private HttpResponse<String> send(String method, String host, String path, String body)
+            throws Exception {
         URI uri = URI.create("http://" + host + ":" + port + path);
         ClassicHttpRequest request;
         switch (method) {
@@ -79,31 +70,60 @@ class VirtualHostTest {
             request.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
         }
 
-        return http.execute(request, response -> {
-            var entity = response.getEntity();
-            String responseBody = entity == null
-                ? ""
-                : EntityUtils.toString(entity, StandardCharsets.UTF_8);
-            int status = response.getCode();
-            URI finalUri = uri;
+        return http.execute(
+                request,
+                response -> {
+                    var entity = response.getEntity();
+                    String responseBody =
+                            entity == null
+                                    ? ""
+                                    : EntityUtils.toString(entity, StandardCharsets.UTF_8);
+                    int status = response.getCode();
+                    URI finalUri = uri;
 
-            return new HttpResponse<String>() {
-                @Override public int statusCode() { return status; }
-                @Override public String body() { return responseBody; }
-                @Override public java.net.http.HttpHeaders headers() { return null; }
-                @Override public java.net.http.HttpRequest request() { return null; }
-                @Override public URI uri() { return finalUri; }
-                @Override public java.util.Optional<java.net.http.HttpResponse<String>> previousResponse() {
-                    return java.util.Optional.empty();
-                }
-                @Override public java.net.http.HttpClient.Version version() {
-                    return java.net.http.HttpClient.Version.HTTP_1_1;
-                }
-                @Override public java.util.Optional<javax.net.ssl.SSLSession> sslSession() {
-                    return java.util.Optional.empty();
-                }
-            };
-        });
+                    return new HttpResponse<String>() {
+                        @Override
+                        public int statusCode() {
+                            return status;
+                        }
+
+                        @Override
+                        public String body() {
+                            return responseBody;
+                        }
+
+                        @Override
+                        public java.net.http.HttpHeaders headers() {
+                            return null;
+                        }
+
+                        @Override
+                        public java.net.http.HttpRequest request() {
+                            return null;
+                        }
+
+                        @Override
+                        public URI uri() {
+                            return finalUri;
+                        }
+
+                        @Override
+                        public java.util.Optional<java.net.http.HttpResponse<String>>
+                                previousResponse() {
+                            return java.util.Optional.empty();
+                        }
+
+                        @Override
+                        public java.net.http.HttpClient.Version version() {
+                            return java.net.http.HttpClient.Version.HTTP_1_1;
+                        }
+
+                        @Override
+                        public java.util.Optional<javax.net.ssl.SSLSession> sslSession() {
+                            return java.util.Optional.empty();
+                        }
+                    };
+                });
     }
 
     @Test

@@ -5,17 +5,16 @@ import it.iorfino.s3forge.model.S3Error;
 import it.iorfino.s3forge.store.Store;
 import it.iorfino.s3forge.xml.XmlReader;
 import it.iorfino.s3forge.xml.XmlWriter;
-import org.w3c.dom.Element;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.w3c.dom.Element;
 
 /**
  * Handler for the S3 {@code DeleteObjects} batch operation.
  *
- * <p>Route: {@code POST /{bucket}?delete}. The request body is an XML
- * document listing the keys to delete:</p>
+ * <p>Route: {@code POST /{bucket}?delete}. The request body is an XML document listing the keys to
+ * delete:
  *
  * <pre>{@code
  * <Delete>
@@ -25,10 +24,9 @@ import java.util.List;
  * </Delete>
  * }</pre>
  *
- * <p>Response is a {@code DeleteResult} listing each deleted key and, when
- * {@code Quiet} is false, the successfully deleted objects. S3 semantics are
- * followed: deleting a non-existent key is not an error and appears in
- * {@code <Deleted>}.</p>
+ * <p>Response is a {@code DeleteResult} listing each deleted key and, when {@code Quiet} is false,
+ * the successfully deleted objects. S3 semantics are followed: deleting a non-existent key is not
+ * an error and appears in {@code <Deleted>}.
  *
  * @since 0.1.0
  */
@@ -51,7 +49,7 @@ public final class DeleteObjectsHandler {
     /**
      * Handles a {@code POST /{bucket}?delete} request.
      *
-     * @param ex     the HTTP exchange
+     * @param ex the HTTP exchange
      * @param bucket the bucket name
      * @throws IOException on I/O failure
      */

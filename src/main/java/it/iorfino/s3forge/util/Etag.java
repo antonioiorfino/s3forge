@@ -9,10 +9,10 @@ import java.util.HexFormat;
 /**
  * Utility for computing S3-compatible ETag values.
  *
- * <p>AWS S3 defines the ETag of a non-multipart object as the hexadecimal MD5
- * digest of its payload, wrapped in double quotes in HTTP headers (e.g.
- * {@code "d41d8cd98f00b204e9800998ecf8427e"}). This class produces the raw
- * hex digest; the quoting is applied by the HTTP layer.</p>
+ * <p>AWS S3 defines the ETag of a non-multipart object as the hexadecimal MD5 digest of its
+ * payload, wrapped in double quotes in HTTP headers (e.g. {@code
+ * "d41d8cd98f00b204e9800998ecf8427e"}). This class produces the raw hex digest; the quoting is
+ * applied by the HTTP layer.
  *
  * @since 0.1.0
  */
@@ -41,7 +41,7 @@ public final class Etag {
     /**
      * Computes the MD5 hex digest of the given stream, fully consuming it.
      *
-     * <p>The stream is <strong>not</strong> closed by this method.</p>
+     * <p>The stream is <strong>not</strong> closed by this method.
      *
      * @param in the input stream; must not be {@code null}
      * @return the lowercase hexadecimal MD5 digest
@@ -62,8 +62,7 @@ public final class Etag {
     }
 
     /**
-     * Wraps an ETag hex digest in double quotes, as required by S3 HTTP
-     * headers.
+     * Wraps an ETag hex digest in double quotes, as required by S3 HTTP headers.
      *
      * @param hexDigest the raw hex digest; must not be {@code null}
      * @return the quoted ETag, e.g. {@code "\"d41d8...\""}

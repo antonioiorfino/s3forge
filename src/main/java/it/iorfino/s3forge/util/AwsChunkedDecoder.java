@@ -8,23 +8,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Decoder for the {@code aws-chunked} content encoding used by AWS SDKs when
- * transmitting objects with trailing checksums.
+ * Decoder for the {@code aws-chunked} content encoding used by AWS SDKs when transmitting objects
+ * with trailing checksums.
  *
- * <p>Starting with AWS SDK for Java v2 version 2.30.0, the SDK enables CRC32
- * checksums by default for operations such as {@code PutObject} and
- * {@code UploadPart}. To avoid interleaving binary checksum data with the
- * object payload, the SDK wraps the body using the {@code aws-chunked}
- * transfer encoding and emits the checksums as HTTP trailers at the end of
- * the stream.</p>
+ * <p>Starting with AWS SDK for Java v2 version 2.30.0, the SDK enables CRC32 checksums by default
+ * for operations such as {@code PutObject} and {@code UploadPart}. To avoid interleaving binary
+ * checksum data with the object payload, the SDK wraps the body using the {@code aws-chunked}
+ * transfer encoding and emits the checksums as HTTP trailers at the end of the stream.
  *
- * <p>The wire format consists of a sequence of chunks, each prefixed by its
- * size in hexadecimal followed by CRLF, then the chunk data followed by
- * CRLF. A zero-sized chunk terminates the stream, optionally followed by
- * trailer headers (e.g. {@code x-amz-checksum-crc32}) and a final CRLF.
- * Each chunk may carry extensions after a semicolon, most commonly a
- * {@code chunk-signature} used by AWS Signature Version 4 streaming
- * uploads:</p>
+ * <p>The wire format consists of a sequence of chunks, each prefixed by its size in hexadecimal
+ * followed by CRLF, then the chunk data followed by CRLF. A zero-sized chunk terminates the stream,
+ * optionally followed by trailer headers (e.g. {@code x-amz-checksum-crc32}) and a final CRLF. Each
+ * chunk may carry extensions after a semicolon, most commonly a {@code chunk-signature} used by AWS
+ * Signature Version 4 streaming uploads:
  *
  * <pre>{@code
  * 1a;chunk-signature=abc123\r\n
@@ -34,13 +30,11 @@ import java.util.Map;
  * \r\n
  * }</pre>
  *
- * <p>This decoder is tolerant of both signed and unsigned chunks: chunk
- * extensions are parsed but ignored, and trailer header names are
- * normalized to lowercase for consistent lookup.</p>
+ * <p>This decoder is tolerant of both signed and unsigned chunks: chunk extensions are parsed but
+ * ignored, and trailer header names are normalized to lowercase for consistent lookup.
  *
- * <p>Instances of this class are stateless; all state is local to the
- * {@link #decode(InputStream)} call, making the decoder safe for concurrent
- * use.</p>
+ * <p>Instances of this class are stateless; all state is local to the {@link #decode(InputStream)}
+ * call, making the decoder safe for concurrent use.
  *
  * @since 0.1.0
  */
@@ -49,10 +43,9 @@ public final class AwsChunkedDecoder {
     /**
      * Result of decoding an {@code aws-chunked} stream.
      *
-     * @param payload  the decoded object bytes, with all chunk framing and
-     *                 trailers removed
-     * @param trailers trailer headers extracted from the end of the stream;
-     *                 keys are lowercase, values are trimmed
+     * @param payload the decoded object bytes, with all chunk framing and trailers removed
+     * @param trailers trailer headers extracted from the end of the stream; keys are lowercase,
+     *     values are trimmed
      * @since 0.1.0
      */
     public record Result(byte[] payload, Map<String, String> trailers) {}
@@ -64,15 +57,15 @@ public final class AwsChunkedDecoder {
     /**
      * Decodes an {@code aws-chunked} stream.
      *
-     * <p>The input stream is fully consumed but <strong>not</strong> closed;
-     * callers retain ownership.</p>
+     * <p>The input stream is fully consumed but <strong>not</strong> closed; callers retain
+     * ownership.
      *
      * @param in the raw request body; must not be {@code null}
      * @return the decoded payload and trailers; never {@code null}
-     * @throws IOException if the stream is malformed (truncated chunk,
-     *                     invalid hexadecimal size, missing CRLF)
-     * @throws NumberFormatException wrapped in {@link IOException} if a
-     *                     chunk size line is not valid hexadecimal
+     * @throws IOException if the stream is malformed (truncated chunk, invalid hexadecimal size,
+     *     missing CRLF)
+     * @throws NumberFormatException wrapped in {@link IOException} if a chunk size line is not
+     *     valid hexadecimal
      */
     public static Result decode(InputStream in) throws IOException {
         ByteArrayOutputStream payload = new ByteArrayOutputStream(8192);
@@ -118,8 +111,10 @@ public final class AwsChunkedDecoder {
             byte[] chunk = in.readNBytes(size);
             if (chunk.length < size) {
                 throw new IOException(
-                    "Truncated aws-chunked payload: expected " + size
-                        + " bytes, got " + chunk.length);
+                        "Truncated aws-chunked payload: expected "
+                                + size
+                                + " bytes, got "
+                                + chunk.length);
             }
             payload.write(chunk);
 
@@ -133,9 +128,8 @@ public final class AwsChunkedDecoder {
     /**
      * Reads a CRLF-terminated line from the stream.
      *
-     * <p>A trailing carriage return is stripped if present, so the returned
-     * string contains only the line content. Returns {@code null} on
-     * end-of-stream before any byte is read.</p>
+     * <p>A trailing carriage return is stripped if present, so the returned string contains only
+     * the line content. Returns {@code null} on end-of-stream before any byte is read.
      *
      * @param in the input stream
      * @return the line content without CRLF, or {@code null} at end of stream

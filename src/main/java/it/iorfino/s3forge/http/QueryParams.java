@@ -8,10 +8,9 @@ import java.util.Map;
 /**
  * Small immutable wrapper around HTTP query parameters.
  *
- * <p>Parses a raw query string (the part after {@code ?} in a URL) into a
- * case-sensitive key/value map. All keys and values are URL-decoded using
- * UTF-8. Duplicated keys keep the first occurrence, matching the behavior of
- * most S3 query parameters (which are unique by contract).</p>
+ * <p>Parses a raw query string (the part after {@code ?} in a URL) into a case-sensitive key/value
+ * map. All keys and values are URL-decoded using UTF-8. Duplicated keys keep the first occurrence,
+ * matching the behavior of most S3 query parameters (which are unique by contract).
  *
  * @since 0.1.0
  */
@@ -64,10 +63,9 @@ public final class QueryParams {
     }
 
     /**
-     * Returns the value of a parameter, or {@code defaultVal} if absent or
-     * empty.
+     * Returns the value of a parameter, or {@code defaultVal} if absent or empty.
      *
-     * @param key        the parameter name
+     * @param key the parameter name
      * @param defaultVal the fallback value
      * @return the value or the fallback; never {@code null}
      */
@@ -89,11 +87,10 @@ public final class QueryParams {
     /**
      * Parses a parameter as a non-negative integer.
      *
-     * @param key        the parameter name
+     * @param key the parameter name
      * @param defaultVal the value to return if the parameter is absent
      * @return the parsed integer or the default
-     * @throws IllegalArgumentException if the value is present but not a
-     *                                  non-negative integer
+     * @throws IllegalArgumentException if the value is present but not a non-negative integer
      */
     public int getInt(String key, int defaultVal) {
         String v = values.get(key);
@@ -104,7 +101,7 @@ public final class QueryParams {
             return n;
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
-                "Invalid integer for parameter '" + key + "': " + v, e);
+                    "Invalid integer for parameter '" + key + "': " + v, e);
         }
     }
 

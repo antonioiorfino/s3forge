@@ -8,13 +8,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Mutable state for an in-progress S3 multipart upload.
  *
- * <p>An upload is identified by a server-generated {@link #uploadId} and is
- * bound to a destination bucket and key. Parts are stored keyed by their
- * 1-based part number; the S3 API allows up to 10,000 parts per upload.</p>
+ * <p>An upload is identified by a server-generated {@link #uploadId} and is bound to a destination
+ * bucket and key. Parts are stored keyed by their 1-based part number; the S3 API allows up to
+ * 10,000 parts per upload.
  *
- * <p>This class is thread-safe: parts may be uploaded concurrently, and the
- * map is backed by a {@link ConcurrentHashMap}. Ordering is enforced at
- * completion time by iterating a {@link TreeMap} view.</p>
+ * <p>This class is thread-safe: parts may be uploaded concurrently, and the map is backed by a
+ * {@link ConcurrentHashMap}. Ordering is enforced at completion time by iterating a {@link TreeMap}
+ * view.
  *
  * @since 0.1.0
  */
@@ -35,14 +35,12 @@ public final class MultipartUpload {
     /**
      * Creates a new multipart upload.
      *
-     * @param uploadId    the server-generated upload identifier
-     * @param bucket      the destination bucket
-     * @param key         the destination key
-     * @param contentType the MIME type to assign at completion, or
-     *                    {@code null} for a default
+     * @param uploadId the server-generated upload identifier
+     * @param bucket the destination bucket
+     * @param key the destination key
+     * @param contentType the MIME type to assign at completion, or {@code null} for a default
      */
-    public MultipartUpload(String uploadId, String bucket, String key,
-                           String contentType) {
+    public MultipartUpload(String uploadId, String bucket, String key, String contentType) {
         this.uploadId = uploadId;
         this.bucket = bucket;
         this.key = key;
@@ -55,45 +53,53 @@ public final class MultipartUpload {
      *
      * @return the upload id; never {@code null}
      */
-    public String uploadId() { return uploadId; }
+    public String uploadId() {
+        return uploadId;
+    }
 
     /**
      * Returns the destination bucket.
      *
      * @return the bucket name; never {@code null}
      */
-    public String bucket() { return bucket; }
+    public String bucket() {
+        return bucket;
+    }
 
     /**
      * Returns the destination key.
      *
      * @return the key; never {@code null}
      */
-    public String key() { return key; }
+    public String key() {
+        return key;
+    }
 
     /**
      * Returns the MIME type to assign to the completed object.
      *
      * @return the content type, or {@code null}
      */
-    public String contentType() { return contentType; }
+    public String contentType() {
+        return contentType;
+    }
 
     /**
      * Returns the instant at which the upload was initiated.
      *
      * @return the initiation timestamp; never {@code null}
      */
-    public Instant initiated() { return initiated; }
+    public Instant initiated() {
+        return initiated;
+    }
 
     /**
-     * Stores the payload and ETag for a given part number, replacing any
-     * existing value for the same part.
+     * Stores the payload and ETag for a given part number, replacing any existing value for the
+     * same part.
      *
-     * @param partNumber the 1-based part number; must be in
-     *                   {@code 1..MAX_PARTS}
-     * @param data       the part payload; must not be {@code null}
-     * @param etag       the part ETag (hex MD5, no quotes); must not be
-     *                   {@code null}
+     * @param partNumber the 1-based part number; must be in {@code 1..MAX_PARTS}
+     * @param data the part payload; must not be {@code null}
+     * @param etag the part ETag (hex MD5, no quotes); must not be {@code null}
      * @throws IllegalArgumentException if {@code partNumber} is out of range
      */
     public void putPart(int partNumber, byte[] data, String etag) {

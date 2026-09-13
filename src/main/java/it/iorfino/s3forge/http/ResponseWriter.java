@@ -3,7 +3,6 @@ package it.iorfino.s3forge.http;
 import com.sun.net.httpserver.HttpExchange;
 import it.iorfino.s3forge.model.S3Error;
 import it.iorfino.s3forge.xml.XmlWriter;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -27,13 +26,14 @@ public final class ResponseWriter {
     }
 
     public static void error(HttpExchange ex, S3Error err) throws IOException {
-        String body = new XmlWriter()
-            .header()
-            .open("Error")
-            .element("Code", err.code())
-            .element("Message", err.message())
-            .close("Error")
-            .toString();
+        String body =
+                new XmlWriter()
+                        .header()
+                        .open("Error")
+                        .element("Code", err.code())
+                        .element("Message", err.message())
+                        .close("Error")
+                        .toString();
         xml(ex, err.httpStatus(), body);
     }
 }

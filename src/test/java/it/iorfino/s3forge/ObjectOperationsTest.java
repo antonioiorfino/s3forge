@@ -1,7 +1,13 @@
 package it.iorfino.s3forge;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import it.iorfino.s3forge.support.AwsClientFactory;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -16,14 +22,6 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ObjectOperationsTest {
 
@@ -49,12 +47,13 @@ class ObjectOperationsTest {
     @Test
     void putAndGetObjectRoundTrip() {
         String content = "hello s3forge";
-        client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("greeting.txt").build(),
-            RequestBody.fromString(content, StandardCharsets.UTF_8));
+        client.putObject(
+                PutObjectRequest.builder().bucket(BUCKET).key("greeting.txt").build(),
+                RequestBody.fromString(content, StandardCharsets.UTF_8));
 
-        ResponseBytes<GetObjectResponse> got = client.getObjectAsBytes(
-            GetObjectRequest.builder().bucket(BUCKET).key("greeting.txt").build());
+        ResponseBytes<GetObjectResponse> got =
+                client.getObjectAsBytes(
+                        GetObjectRequest.builder().bucket(BUCKET).key("greeting.txt").build());
 
         assertEquals(content, got.asUtf8String());
         assertNotNull(got.response().eTag());
@@ -63,9 +62,10 @@ class ObjectOperationsTest {
 
     @Test
     void putObjectReturnsEtag() {
-        var response = client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("with-etag.txt").build(),
-            RequestBody.fromString("abc"));
+        var response =
+                client.putObject(
+                        PutObjectRequest.builder().bucket(BUCKET).key("with-etag.txt").build(),
+                        RequestBody.fromString("abc"));
         // MD5("abc") = 900150983cd24fb0d6963f7d28e17f72
         assertEquals("\"900150983cd24fb0d6963f7d28e17f72\"", response.eTag());
     }
@@ -73,12 +73,13 @@ class ObjectOperationsTest {
     @Test
     void headObjectReturnsMetadataWithoutBody() {
         String content = "metadata check";
-        client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("head.txt").build(),
-            RequestBody.fromString(content));
+        client.putObject(
+                PutObjectRequest.builder().bucket(BUCKET).key("head.txt").build(),
+                RequestBody.fromString(content));
 
-        HeadObjectResponse head = client.headObject(HeadObjectRequest.builder()
-            .bucket(BUCKET).key("head.txt").build());
+        HeadObjectResponse head =
+                client.headObject(
+                        HeadObjectRequest.builder().bucket(BUCKET).key("head.txt").build());
 
         assertEquals(content.length(), head.contentLength());
         assertNotNull(head.eTag());
@@ -87,65 +88,78 @@ class ObjectOperationsTest {
 
     @Test
     void getMissingKeyThrowsNoSuchKey() {
-        assertThrows(NoSuchKeyException.class, () ->
-            client.getObjectAsBytes(GetObjectRequest.builder()
-                .bucket(BUCKET).key("does-not-exist").build()));
+        assertThrows(
+                NoSuchKeyException.class,
+                () ->
+                        client.getObjectAsBytes(
+                                GetObjectRequest.builder()
+                                        .bucket(BUCKET)
+                                        .key("does-not-exist")
+                                        .build()));
     }
 
     @Test
     void deleteObjectRemovesIt() {
-        client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("to-delete.txt").build(),
-            RequestBody.fromString("bye"));
+        client.putObject(
+                PutObjectRequest.builder().bucket(BUCKET).key("to-delete.txt").build(),
+                RequestBody.fromString("bye"));
 
-        client.deleteObject(DeleteObjectRequest.builder()
-            .bucket(BUCKET).key("to-delete.txt").build());
+        client.deleteObject(
+                DeleteObjectRequest.builder().bucket(BUCKET).key("to-delete.txt").build());
 
-        assertThrows(NoSuchKeyException.class, () ->
-            client.getObjectAsBytes(GetObjectRequest.builder()
-                .bucket(BUCKET).key("to-delete.txt").build()));
+        assertThrows(
+                NoSuchKeyException.class,
+                () ->
+                        client.getObjectAsBytes(
+                                GetObjectRequest.builder()
+                                        .bucket(BUCKET)
+                                        .key("to-delete.txt")
+                                        .build()));
     }
 
     @Test
     void deleteMissingKeyIsIdempotent() {
         // S3 semantics: deleting a non-existent key returns 204
-        client.deleteObject(DeleteObjectRequest.builder()
-            .bucket(BUCKET).key("never-existed.txt").build());
+        client.deleteObject(
+                DeleteObjectRequest.builder().bucket(BUCKET).key("never-existed.txt").build());
     }
 
     @Test
     void putObjectOverwritesExisting() {
-        client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("overwrite.txt").build(),
-            RequestBody.fromString("v1"));
-        client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("overwrite.txt").build(),
-            RequestBody.fromString("v2-longer"));
+        client.putObject(
+                PutObjectRequest.builder().bucket(BUCKET).key("overwrite.txt").build(),
+                RequestBody.fromString("v1"));
+        client.putObject(
+                PutObjectRequest.builder().bucket(BUCKET).key("overwrite.txt").build(),
+                RequestBody.fromString("v2-longer"));
 
-        var got = client.getObjectAsBytes(GetObjectRequest.builder()
-            .bucket(BUCKET).key("overwrite.txt").build());
+        var got =
+                client.getObjectAsBytes(
+                        GetObjectRequest.builder().bucket(BUCKET).key("overwrite.txt").build());
         assertEquals("v2-longer", got.asUtf8String());
     }
 
     @Test
     void keyWithSlashesIsPreserved() {
-        client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("a/b/c/file.txt").build(),
-            RequestBody.fromString("nested"));
+        client.putObject(
+                PutObjectRequest.builder().bucket(BUCKET).key("a/b/c/file.txt").build(),
+                RequestBody.fromString("nested"));
 
-        var got = client.getObjectAsBytes(GetObjectRequest.builder()
-            .bucket(BUCKET).key("a/b/c/file.txt").build());
+        var got =
+                client.getObjectAsBytes(
+                        GetObjectRequest.builder().bucket(BUCKET).key("a/b/c/file.txt").build());
         assertEquals("nested", got.asUtf8String());
     }
 
     @Test
     void emptyObjectIsSupported() {
-        client.putObject(PutObjectRequest.builder()
-                .bucket(BUCKET).key("empty.txt").build(),
-            RequestBody.empty());
+        client.putObject(
+                PutObjectRequest.builder().bucket(BUCKET).key("empty.txt").build(),
+                RequestBody.empty());
 
-        var got = client.getObjectAsBytes(GetObjectRequest.builder()
-            .bucket(BUCKET).key("empty.txt").build());
+        var got =
+                client.getObjectAsBytes(
+                        GetObjectRequest.builder().bucket(BUCKET).key("empty.txt").build());
         assertEquals(0, got.asByteArray().length);
         // MD5("") = d41d8cd98f00b204e9800998ecf8427e
         assertEquals("\"d41d8cd98f00b204e9800998ecf8427e\"", got.response().eTag());

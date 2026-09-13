@@ -4,7 +4,6 @@ import com.sun.net.httpserver.HttpServer;
 import it.iorfino.s3forge.config.S3ForgeConfig;
 import it.iorfino.s3forge.http.Router;
 import it.iorfino.s3forge.store.Store;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
@@ -24,7 +23,7 @@ final class S3ForgeServer {
         server = HttpServer.create(new InetSocketAddress(config.port()), 0);
         // Java 21: un virtual thread per richiesta
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-        server.createContext("/", new Router(store,config));
+        server.createContext("/", new Router(store, config));
         server.start();
     }
 

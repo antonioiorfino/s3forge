@@ -1,7 +1,6 @@
 package it.iorfino.s3forge.cli;
 
 import it.iorfino.s3forge.S3Forge;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -10,18 +9,18 @@ import java.util.Map;
 /**
  * Command-line launcher for the S3Forge embedded server.
  *
- * <p>Parses a minimal set of flags, constructs an {@link S3Forge} instance
- * with the corresponding backend, and blocks until the JVM receives a
- * termination signal. Intended for use in shell scripts, CI pipelines, and
- * the provided Docker image.</p>
+ * <p>Parses a minimal set of flags, constructs an {@link S3Forge} instance with the corresponding
+ * backend, and blocks until the JVM receives a termination signal. Intended for use in shell
+ * scripts, CI pipelines, and the provided Docker image.
  *
- * <p>Supported flags:</p>
+ * <p>Supported flags:
+ *
  * <ul>
- *   <li>{@code --port N} — TCP port to listen on; default {@code 8001}</li>
- *   <li>{@code --in-memory} — use in-memory storage (default)</li>
- *   <li>{@code --file-system PATH} — use filesystem storage at {@code PATH}</li>
- *   <li>{@code --virtual-host DOMAIN} — enable virtual-host addressing</li>
- *   <li>{@code --help} — print usage and exit</li>
+ *   <li>{@code --port N} — TCP port to listen on; default {@code 8001}
+ *   <li>{@code --in-memory} — use in-memory storage (default)
+ *   <li>{@code --file-system PATH} — use filesystem storage at {@code PATH}
+ *   <li>{@code --virtual-host DOMAIN} — enable virtual-host addressing
+ *   <li>{@code --help} — print usage and exit
  * </ul>
  *
  * @since 0.1.0
@@ -69,10 +68,14 @@ public final class Main {
 
         S3Forge forge = builder.build();
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("S3Forge: shutting down...");
-            forge.close();
-        }, "s3forge-shutdown"));
+        Runtime.getRuntime()
+                .addShutdownHook(
+                        new Thread(
+                                () -> {
+                                    System.out.println("S3Forge: shutting down...");
+                                    forge.close();
+                                },
+                                "s3forge-shutdown"));
 
         try {
             forge.start();
@@ -103,13 +106,13 @@ public final class Main {
     /**
      * Parses the command-line arguments into a key/value map.
      *
-     * <p>Recognizes {@code --flag value} and {@code --flag=value} forms.
-     * Boolean flags are stored with an empty string value.</p>
+     * <p>Recognizes {@code --flag value} and {@code --flag=value} forms. Boolean flags are stored
+     * with an empty string value.
      *
      * @param args the raw arguments
      * @return a mutable map of parsed options; never {@code null}
-     * @throws IllegalArgumentException if an unknown flag is encountered or
-     *                                  a flag requiring a value is missing it
+     * @throws IllegalArgumentException if an unknown flag is encountered or a flag requiring a
+     *     value is missing it
      */
     static Map<String, String> parseArgs(String[] args) {
         Map<String, String> out = new HashMap<>();
@@ -129,8 +132,7 @@ public final class Main {
                 // Known value-bearing flags consume the next argument.
                 if (isValueFlag(key)) {
                     if (i + 1 >= args.length) {
-                        throw new IllegalArgumentException(
-                            "missing value for --" + key);
+                        throw new IllegalArgumentException("missing value for --" + key);
                     }
                     value = args[++i];
                 }
@@ -159,7 +161,8 @@ public final class Main {
      * @param out the destination stream
      */
     private static void printUsage(java.io.PrintStream out) {
-        out.println("""
+        out.println(
+                """
                 S3Forge — embedded S3 mock server
 
                 Usage:

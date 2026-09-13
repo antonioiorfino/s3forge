@@ -1,10 +1,11 @@
 # S3Forge
 
 [![CI](https://github.com/antonioiorfino/s3forge/actions/workflows/ci.yml/badge.svg)](https://github.com/antonioiorfino/s3forge/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/antonioiorfino/s3forge/releases/tag/v0.1.0)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
 
-**S3Forge** is an embedded S3 mock server written in **pure Java 21**, with
+**S3Forge** is an embedded S3 mock server written in **pure Java**, with
 **zero framework dependencies**. It implements a practical subset of the
 AWS S3 HTTP API and is designed for integration testing of applications
 that talk to S3 — without hitting real AWS endpoints.
@@ -15,7 +16,7 @@ DOM parser for XML. No Spring, no Vert.x, no Akka. Just Java.
 
 ## Highlights
 
-- **Pure Java 21** — no runtime dependencies beyond the JDK
+- **Pure Java** — no runtime dependencies beyond the JDK
 - **Two storage backends**, fully interchangeable:
     - `InMemoryStore` — everything in RAM, ideal for fast isolated tests
     - `FileSystemStore` — buckets mapped to directories, data survives restarts
@@ -68,10 +69,17 @@ These may be added later; see the issue tracker.
 
 ## Getting started
 
-### As a test dependency (Maven)
+S3Forge is not published to a public artifact repository yet. To use it,
+build it locally and install it into your Maven cache:
+
+    git clone https://github.com/antonioiorfino/s3forge.git
+    cd s3forge
+    mvn clean install
+
+Then declare it as a test dependency in your project:
 
     <dependency>
-        <groupId>io.github.s3forge</groupId>
+        <groupId>it.iorfino</groupId>
         <artifactId>s3forge</artifactId>
         <version>0.1.0</version>
         <scope>test</scope>
@@ -79,11 +87,11 @@ These may be added later; see the issue tracker.
 
 ### As a test dependency (Gradle)
 
-    testImplementation("io.github.s3forge:s3forge:0.1.0")
+    testImplementation("it.iorfino:s3forge:0.1.0")
 
 ### Embedded in a test (JUnit 5)
 
-    import io.github.s3forge.S3Forge;
+    import it.iorfino.s3forge.S3Forge;
     import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
     import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
     import software.amazon.awssdk.core.sync.RequestBody;
@@ -228,9 +236,10 @@ and stores the extracted checksum alongside the object, so subsequent
 
 ## Project status
 
-S3Forge is at an early stage. The API surface is stable for the
+**0.1.0** — first public release. The API surface is stable for the
 operations listed above, but the project has not yet reached a 1.0
-release. Feedback and contributions are welcome.
+release, so minor versions may introduce breaking changes. Feedback
+and contributions are welcome.
 
 ## License
 

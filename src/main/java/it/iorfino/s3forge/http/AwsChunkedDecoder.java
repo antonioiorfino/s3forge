@@ -8,13 +8,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Decoder for the {@code aws-chunked} content encoding used by AWS SDKs
- * when transmitting objects with trailing checksums.
+ * Decoder for the {@code aws-chunked} content encoding used by AWS SDKs when transmitting objects
+ * with trailing checksums.
  *
- * <p>The wire format consists of a sequence of chunks, each prefixed by its
- * size in hexadecimal followed by CRLF, then the chunk data followed by CRLF.
- * A zero-sized chunk terminates the stream, optionally followed by trailer
- * headers (e.g. {@code x-amz-checksum-crc32}) and a final CRLF.</p>
+ * <p>The wire format consists of a sequence of chunks, each prefixed by its size in hexadecimal
+ * followed by CRLF, then the chunk data followed by CRLF. A zero-sized chunk terminates the stream,
+ * optionally followed by trailer headers (e.g. {@code x-amz-checksum-crc32}) and a final CRLF.
  *
  * @since 0.1.0
  */
@@ -23,9 +22,8 @@ public final class AwsChunkedDecoder {
     /**
      * Result of decoding an {@code aws-chunked} stream.
      *
-     * @param payload  the decoded object bytes
-     * @param trailers trailer headers extracted from the end of the stream;
-     *                 keys are lowercase
+     * @param payload the decoded object bytes
+     * @param trailers trailer headers extracted from the end of the stream; keys are lowercase
      */
     public record Result(byte[] payload, Map<String, String> trailers) {}
 

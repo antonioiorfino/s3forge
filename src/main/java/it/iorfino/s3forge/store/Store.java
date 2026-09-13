@@ -8,20 +8,20 @@ import java.util.Optional;
 /**
  * Storage abstraction used by S3Forge.
  *
- * <p>The HTTP layer only ever talks to this interface, never to a concrete
- * implementation. This makes the in-memory and filesystem backends fully
- * interchangeable and allows new backends (e.g. an on-disk embedded database)
- * to be added without touching the request-handling code.</p>
+ * <p>The HTTP layer only ever talks to this interface, never to a concrete implementation. This
+ * makes the in-memory and filesystem backends fully interchangeable and allows new backends (e.g.
+ * an on-disk embedded database) to be added without touching the request-handling code.
  *
- * <p><strong>Contract for implementations:</strong></p>
+ * <p><strong>Contract for implementations:</strong>
+ *
  * <ul>
- *   <li>Methods that target a non-existent bucket must throw
- *       {@link IOException} with message {@code "NoSuchBucket"}.</li>
- *   <li>{@link #deleteBucket(String)} must throw {@link IOException} with
- *       message {@code "BucketNotEmpty"} if the bucket still contains objects.</li>
- *   <li>{@link #getObject(String, String)} returns {@link Optional#empty()} when
- *       the key does not exist.</li>
- *   <li>All methods must be safe for concurrent use.</li>
+ *   <li>Methods that target a non-existent bucket must throw {@link IOException} with message
+ *       {@code "NoSuchBucket"}.
+ *   <li>{@link #deleteBucket(String)} must throw {@link IOException} with message {@code
+ *       "BucketNotEmpty"} if the bucket still contains objects.
+ *   <li>{@link #getObject(String, String)} returns {@link Optional#empty()} when the key does not
+ *       exist.
+ *   <li>All methods must be safe for concurrent use.
  * </ul>
  *
  * @since 0.1.0
@@ -33,8 +33,7 @@ public interface Store {
     // ------------------------------------------------------------------
 
     /**
-     * Creates a new bucket. If the bucket already exists, this method is a
-     * no-op (idempotent).
+     * Creates a new bucket. If the bucket already exists, this method is a no-op (idempotent).
      *
      * @param bucket the bucket name; must not be {@code null}
      * @throws IOException if the bucket cannot be created
@@ -53,9 +52,8 @@ public interface Store {
      * Deletes an empty bucket.
      *
      * @param bucket the bucket name; must not be {@code null}
-     * @throws IOException with message {@code "NoSuchBucket"} if the bucket
-     *                     does not exist, or {@code "BucketNotEmpty"} if it
-     *                     still contains objects
+     * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist, or
+     *     {@code "BucketNotEmpty"} if it still contains objects
      */
     void deleteBucket(String bucket) throws IOException;
 
@@ -74,107 +72,106 @@ public interface Store {
     /**
      * Stores an object, replacing any existing object with the same key.
      *
-     * <p>The stream is fully consumed by this call; callers must not rely on
-     * it being readable afterwards.</p>
+     * <p>The stream is fully consumed by this call; callers must not rely on it being readable
+     * afterwards.
      *
-     * <p>The {@code etag} and {@code checksumCrc32} parameters are computed by
-     * the HTTP layer (see {@code ObjectHandler}) and stored verbatim so that
-     * subsequent {@code GET} and {@code HEAD} requests can return them without
-     * recomputation.</p>
+     * <p>The {@code etag} and {@code checksumCrc32} parameters are computed by the HTTP layer (see
+     * {@code ObjectHandler}) and stored verbatim so that subsequent {@code GET} and {@code HEAD}
+     * requests can return them without recomputation.
      *
-     * @param bucket        the target bucket; must exist
-     * @param key           the object key; must not be {@code null}
-     * @param data          the object payload; must not be {@code null}
+     * @param bucket the target bucket; must exist
+     * @param key the object key; must not be {@code null}
+     * @param data the object payload; must not be {@code null}
      * @param contentLength the payload length in bytes, or {@code -1} if unknown
-     * @param contentType   the MIME type, or {@code null} for a default
-     * @param etag          the pre-computed ETag value (hex MD5, without
-     *                      surrounding quotes), or {@code null} if not
-     *                      applicable
-     * @param checksumCrc32 the pre-computed CRC32 checksum encoded as a
-     *                      Base64 string in big-endian form (as required by
-     *                      the S3 {@code x-amz-checksum-crc32} header), or
-     *                      {@code null} if not available
-     * @throws IOException with message {@code "NoSuchBucket"} if the bucket
-     *                     does not exist, or on any I/O error
+     * @param contentType the MIME type, or {@code null} for a default
+     * @param etag the pre-computed ETag value (hex MD5, without surrounding quotes), or {@code
+     *     null} if not applicable
+     * @param checksumCrc32 the pre-computed CRC32 checksum encoded as a Base64 string in big-endian
+     *     form (as required by the S3 {@code x-amz-checksum-crc32} header), or {@code null} if not
+     *     available
+     * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist, or on
+     *     any I/O error
      */
-    void putObject(String bucket, String key,
-                   InputStream data, long contentLength,
-                   String contentType, String etag,
-                   String checksumCrc32) throws IOException;
+    void putObject(
+            String bucket,
+            String key,
+            InputStream data,
+            long contentLength,
+            String contentType,
+            String etag,
+            String checksumCrc32)
+            throws IOException;
 
     /**
      * Retrieves an object along with its metadata.
      *
-     * <p>The returned {@link StoredObject} carries a fresh
-     * {@link InputStream} positioned at the beginning of the payload. Callers
-     * are responsible for closing it.</p>
+     * <p>The returned {@link StoredObject} carries a fresh {@link InputStream} positioned at the
+     * beginning of the payload. Callers are responsible for closing it.
      *
      * @param bucket the bucket name
-     * @param key    the object key
-     * @return an {@link Optional} containing the object if found, or
-     *         {@link Optional#empty()} otherwise
+     * @param key the object key
+     * @return an {@link Optional} containing the object if found, or {@link Optional#empty()}
+     *     otherwise
      * @throws IOException on any I/O error
      */
     Optional<StoredObject> getObject(String bucket, String key) throws IOException;
 
     /**
-     * Deletes a single object. Deleting a non-existent key is a no-op
-     * (S3 semantics).
+     * Deletes a single object. Deleting a non-existent key is a no-op (S3 semantics).
      *
      * @param bucket the bucket name; must exist
-     * @param key    the object key; must not be {@code null}
-     * @throws IOException with message {@code "NoSuchBucket"} if the bucket
-     *                     does not exist
+     * @param key the object key; must not be {@code null}
+     * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist
      */
     void deleteObject(String bucket, String key) throws IOException;
 
     /**
      * Deletes multiple objects in a single call.
      *
-     * <p>Non-existent keys are silently ignored, matching the semantics of
-     * {@code DeleteObjects} in the S3 API.</p>
+     * <p>Non-existent keys are silently ignored, matching the semantics of {@code DeleteObjects} in
+     * the S3 API.
      *
      * @param bucket the bucket name; must exist
-     * @param keys   the keys to delete; must not be {@code null}
-     * @throws IOException with message {@code "NoSuchBucket"} if the bucket
-     *                     does not exist
+     * @param keys the keys to delete; must not be {@code null}
+     * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist
      */
     void deleteObjects(String bucket, List<String> keys) throws IOException;
 
     /**
-     * Lists objects in a bucket with prefix filtering, delimiter grouping and
-     * pagination, matching the semantics of the S3 {@code ListObjectsV2} API.
+     * Lists objects in a bucket with prefix filtering, delimiter grouping and pagination, matching
+     * the semantics of the S3 {@code ListObjectsV2} API.
      *
-     * <p>Iteration is lexicographic by key. Pagination works as follows:</p>
+     * <p>Iteration is lexicographic by key. Pagination works as follows:
+     *
      * <ul>
-     *   <li>If {@code continuationToken} is non-null, iteration starts at the
-     *       first key strictly greater than the token.</li>
-     *   <li>Otherwise, if {@code marker} is non-null, iteration starts at the
-     *       first key strictly greater than the marker (v1 semantics).</li>
-     *   <li>Otherwise, iteration starts at the first matching key.</li>
+     *   <li>If {@code continuationToken} is non-null, iteration starts at the first key strictly
+     *       greater than the token.
+     *   <li>Otherwise, if {@code marker} is non-null, iteration starts at the first key strictly
+     *       greater than the marker (v1 semantics).
+     *   <li>Otherwise, iteration starts at the first matching key.
      * </ul>
      *
-     * <p>The {@code maxKeys} limit applies to {@code objects.size() +
-     * commonPrefixes.size()}, matching S3 behavior. When the limit is hit and
-     * more keys remain, the result is marked truncated and the appropriate
-     * next marker/token is populated.</p>
+     * <p>The {@code maxKeys} limit applies to {@code objects.size() + commonPrefixes.size()},
+     * matching S3 behavior. When the limit is hit and more keys remain, the result is marked
+     * truncated and the appropriate next marker/token is populated.
      *
-     * @param bucket            the bucket name; must exist
-     * @param prefix            filter for keys starting with this string, or
-     *                          {@code null}/empty for no filtering
-     * @param delimiter         grouping character (typically {@code "/"}), or
-     *                          {@code null}/empty for a flat listing
-     * @param maxKeys           maximum number of entries to return; {@code 0}
-     *                          or negative means "no limit"
-     * @param marker            v1 pagination marker, or {@code null}
+     * @param bucket the bucket name; must exist
+     * @param prefix filter for keys starting with this string, or {@code null}/empty for no
+     *     filtering
+     * @param delimiter grouping character (typically {@code "/"}), or {@code null}/empty for a flat
+     *     listing
+     * @param maxKeys maximum number of entries to return; {@code 0} or negative means "no limit"
+     * @param marker v1 pagination marker, or {@code null}
      * @param continuationToken v2 pagination token, or {@code null}
      * @return a {@link ListResult}; never {@code null}
      * @throws IOException on any I/O error
      */
-    ListResult listObjects(String bucket,
-                           String prefix,
-                           String delimiter,
-                           int maxKeys,
-                           String marker,
-                           String continuationToken) throws IOException;
+    ListResult listObjects(
+            String bucket,
+            String prefix,
+            String delimiter,
+            int maxKeys,
+            String marker,
+            String continuationToken)
+            throws IOException;
 }

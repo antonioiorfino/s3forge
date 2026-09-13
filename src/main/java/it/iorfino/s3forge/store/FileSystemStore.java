@@ -13,9 +13,11 @@ import java.util.stream.Stream;
 public final class FileSystemStore implements MultipartStore {
 
     private final Path root;
+
     /** uploadId -> upload (parts held in memory until completion) */
     private final java.util.Map<String, MultipartUpload> uploads =
-        new java.util.concurrent.ConcurrentHashMap<>();
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     /** Directory name under the root that holds all sidecar metadata files. */
     private static final String META_DIR = ".s3forge-meta";
 
@@ -64,9 +66,13 @@ public final class FileSystemStore implements MultipartStore {
         if (Files.isDirectory(meta)) {
             try (Stream<Path> walk = Files.walk(meta)) {
                 walk.sorted(java.util.Comparator.reverseOrder())
-                    .forEach(p -> {
-                        try { Files.deleteIfExists(p); } catch (IOException ignored) {}
-                    });
+                        .forEach(
+                                p -> {
+                                    try {
+                                        Files.deleteIfExists(p);
+                                    } catch (IOException ignored) {
+                                    }
+                                });
             }
         }
     }
@@ -76,66 +82,68 @@ public final class FileSystemStore implements MultipartStore {
         if (!Files.isDirectory(root)) return List.of();
         try (Stream<Path> s = Files.list(root)) {
             return s.filter(Files::isDirectory)
-                .filter(p -> !META_DIR.equals(p.getFileName().toString()))
-                .map(p -> p.getFileName().toString())
-                .sorted()
-                .toList();
+                    .filter(p -> !META_DIR.equals(p.getFileName().toString()))
+                    .map(p -> p.getFileName().toString())
+                    .sorted()
+                    .toList();
         }
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Writes the payload to a file under {@code <root>/<bucket>/<key>},
-     * creating intermediate directories as needed. Metadata such as ETag,
-     * content type and CRC32 checksum is currently recomputed on read rather
-     * than persisted alongside the file.</p>
+     * <p>Writes the payload to a file under {@code <root>/<bucket>/<key>}, creating intermediate
+     * directories as needed. Metadata such as ETag, content type and CRC32 checksum is currently
+     * recomputed on read rather than persisted alongside the file.
      */
     @Override
-    public void putObject(String bucket, String key,
-                          InputStream data, long contentLength,
-                          String contentType, String etag,
-                          String checksumCrc32) throws IOException {
+    public void putObject(
+            String bucket,
+            String key,
+            InputStream data,
+            long contentLength,
+            String contentType,
+            String etag,
+            String checksumCrc32)
+            throws IOException {
         Path p = objectPath(bucket, key);
         Files.createDirectories(p.getParent());
         Files.copy(data, p, StandardCopyOption.REPLACE_EXISTING);
 
-        new ObjectMetadata(etag, contentType, checksumCrc32)
-            .write(metaObjectPath(bucket, key));
+        new ObjectMetadata(etag, contentType, checksumCrc32).write(metaObjectPath(bucket, key));
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Reads the file size, content type and last-modified timestamp from
-     * the filesystem. The ETag and CRC32 checksum are left empty: without a
-     * sidecar metadata file they cannot be recovered after a restart, and
-     * recomputing them here would require reading the whole payload.</p>
+     * <p>Reads the file size, content type and last-modified timestamp from the filesystem. The
+     * ETag and CRC32 checksum are left empty: without a sidecar metadata file they cannot be
+     * recovered after a restart, and recomputing them here would require reading the whole payload.
      *
-     * <p>This is acceptable for integration testing, where clients typically
-     * upload and immediately read back within the same run. Persisting
-     * metadata is tracked as a future enhancement.</p>
+     * <p>This is acceptable for integration testing, where clients typically upload and immediately
+     * read back within the same run. Persisting metadata is tracked as a future enhancement.
      */
     @Override
-    public Optional<StoredObject> getObject(String bucket, String key)
-        throws IOException {
+    public Optional<StoredObject> getObject(String bucket, String key) throws IOException {
         Path p = objectPath(bucket, key);
         if (!Files.isRegularFile(p)) return Optional.empty();
 
         ObjectMetadata meta = ObjectMetadata.read(metaObjectPath(bucket, key));
-        String contentType = meta.contentType().isEmpty()
-            ? Files.probeContentType(p)
-            : meta.contentType();
+        String contentType =
+                meta.contentType().isEmpty() ? Files.probeContentType(p) : meta.contentType();
 
-        return Optional.of(new StoredObject(
-            bucket, key,
-            Files.size(p),
-            meta.etag(),
-            contentType,
-            Files.getLastModifiedTime(p).toInstant(),
-            meta.checksumCrc32(),
-            Files.newInputStream(p)));
+        return Optional.of(
+                new StoredObject(
+                        bucket,
+                        key,
+                        Files.size(p),
+                        meta.etag(),
+                        contentType,
+                        Files.getLastModifiedTime(p).toInstant(),
+                        meta.checksumCrc32(),
+                        Files.newInputStream(p)));
     }
+
     @Override
     public void deleteObject(String bucket, String key) throws IOException {
         Path p = objectPath(bucket, key);
@@ -156,8 +164,9 @@ public final class FileSystemStore implements MultipartStore {
         // Same cleanup in the metadata tree.
         Path metaParent = metaObjectPath(bucket, key).getParent();
         Path metaBucket = metaBucketPath(bucket);
-        while (metaParent != null && !metaParent.equals(metaBucket)
-            && Files.isDirectory(metaParent)) {
+        while (metaParent != null
+                && !metaParent.equals(metaBucket)
+                && Files.isDirectory(metaParent)) {
             try (Stream<Path> s = Files.list(metaParent)) {
                 if (s.findAny().isPresent()) break;
             }
@@ -174,26 +183,26 @@ public final class FileSystemStore implements MultipartStore {
     /**
      * {@inheritDoc}
      *
-     * <p>Walks the bucket directory recursively, collecting all regular files
-     * whose relative path (with forward slashes) starts with the given prefix.
-     * Keys are then sorted lexicographically and filtered through the optional
-     * delimiter, grouping matching keys into common prefixes.</p>
+     * <p>Walks the bucket directory recursively, collecting all regular files whose relative path
+     * (with forward slashes) starts with the given prefix. Keys are then sorted lexicographically
+     * and filtered through the optional delimiter, grouping matching keys into common prefixes.
      *
-     * <p>Because the filesystem backend does not persist sidecar metadata,
-     * the ETag and CRC32 checksum fields are left empty in the returned
-     * summaries. Clients that need these values should perform a
-     * {@code GET} or {@code HEAD} on the specific object.</p>
+     * <p>Because the filesystem backend does not persist sidecar metadata, the ETag and CRC32
+     * checksum fields are left empty in the returned summaries. Clients that need these values
+     * should perform a {@code GET} or {@code HEAD} on the specific object.
      *
-     * <p>The returned {@link StoredObject} instances are summaries: their
-     * {@code data} field is always {@code null}.</p>
+     * <p>The returned {@link StoredObject} instances are summaries: their {@code data} field is
+     * always {@code null}.
      */
     @Override
-    public ListResult listObjects(String bucket,
-                                  String prefix,
-                                  String delimiter,
-                                  int maxKeys,
-                                  String marker,
-                                  String continuationToken) throws IOException {
+    public ListResult listObjects(
+            String bucket,
+            String prefix,
+            String delimiter,
+            int maxKeys,
+            String marker,
+            String continuationToken)
+            throws IOException {
         Path b = bucketPath(bucket);
         if (!Files.isDirectory(b)) return ListResult.empty();
 
@@ -204,11 +213,11 @@ public final class FileSystemStore implements MultipartStore {
         List<String> keys = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(b)) {
             walk.filter(Files::isRegularFile)
-                .map(file -> b.relativize(file).toString().replace('\\', '/'))
-                .filter(k -> k.startsWith(p))
-                .filter(k -> startAfter == null || k.compareTo(startAfter) > 0)
-                .sorted()
-                .forEach(keys::add);
+                    .map(file -> b.relativize(file).toString().replace('\\', '/'))
+                    .filter(k -> k.startsWith(p))
+                    .filter(k -> startAfter == null || k.compareTo(startAfter) > 0)
+                    .sorted()
+                    .forEach(keys::add);
         }
 
         List<StoredObject> objects = new ArrayList<>();
@@ -234,8 +243,7 @@ public final class FileSystemStore implements MultipartStore {
 
             int currentCount = objects.size() + commonPrefixes.size();
             if (limit && currentCount >= maxKeys) {
-                return ListResult.truncated(objects, commonPrefixes,
-                    lastEmitted, lastEmitted);
+                return ListResult.truncated(objects, commonPrefixes, lastEmitted, lastEmitted);
             }
 
             if (isCommonPrefix) {
@@ -243,18 +251,18 @@ public final class FileSystemStore implements MultipartStore {
             } else {
                 Path file = b.resolve(key);
                 ObjectMetadata m = ObjectMetadata.read(metaObjectPath(bucket, key));
-                String contentType = m.contentType().isEmpty()
-                    ? Files.probeContentType(file)
-                    : m.contentType();
-                objects.add(new StoredObject(
-                    bucket,
-                    key,
-                    Files.size(file),
-                    m.etag(),
-                    contentType,
-                    Files.getLastModifiedTime(file).toInstant(),
-                    m.checksumCrc32(),
-                    null));
+                String contentType =
+                        m.contentType().isEmpty() ? Files.probeContentType(file) : m.contentType();
+                objects.add(
+                        new StoredObject(
+                                bucket,
+                                key,
+                                Files.size(file),
+                                m.etag(),
+                                contentType,
+                                Files.getLastModifiedTime(file).toInstant(),
+                                m.checksumCrc32(),
+                                null));
             }
             lastEmitted = entry;
         }
@@ -269,15 +277,13 @@ public final class FileSystemStore implements MultipartStore {
     /**
      * {@inheritDoc}
      *
-     * <p>Part payloads are buffered in memory until the upload is completed,
-     * at which point the concatenated object is written to disk via
-     * {@link #putObject}. This keeps the implementation simple at the cost
-     * of memory proportional to the total size of in-flight multipart
-     * uploads.</p>
+     * <p>Part payloads are buffered in memory until the upload is completed, at which point the
+     * concatenated object is written to disk via {@link #putObject}. This keeps the implementation
+     * simple at the cost of memory proportional to the total size of in-flight multipart uploads.
      */
     @Override
-    public MultipartUpload initiateMultipart(String bucket, String key,
-                                             String contentType) throws IOException {
+    public MultipartUpload initiateMultipart(String bucket, String key, String contentType)
+            throws IOException {
         if (!bucketExists(bucket)) throw new IOException("NoSuchBucket");
         String uploadId = java.util.UUID.randomUUID().toString();
         MultipartUpload up = new MultipartUpload(uploadId, bucket, key, contentType);
@@ -285,9 +291,7 @@ public final class FileSystemStore implements MultipartStore {
         return up;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public Optional<MultipartUpload> getMultipart(String bucket, String uploadId) {
         MultipartUpload up = uploads.get(uploadId);
@@ -295,26 +299,21 @@ public final class FileSystemStore implements MultipartStore {
         return Optional.of(up);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
-    public void uploadPart(String bucket, String uploadId, int partNumber,
-                           byte[] data, String etag) throws IOException {
-        MultipartUpload up = getMultipart(bucket, uploadId)
-            .orElseThrow(() -> new IOException("NoSuchUpload"));
+    public void uploadPart(String bucket, String uploadId, int partNumber, byte[] data, String etag)
+            throws IOException {
+        MultipartUpload up =
+                getMultipart(bucket, uploadId).orElseThrow(() -> new IOException("NoSuchUpload"));
         up.putPart(partNumber, data, etag);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
-    public StoredObject completeMultipart(String bucket, String uploadId,
-                                          List<Integer> partNumbers)
-        throws IOException {
-        MultipartUpload up = getMultipart(bucket, uploadId)
-            .orElseThrow(() -> new IOException("NoSuchUpload"));
+    public StoredObject completeMultipart(String bucket, String uploadId, List<Integer> partNumbers)
+            throws IOException {
+        MultipartUpload up =
+                getMultipart(bucket, uploadId).orElseThrow(() -> new IOException("NoSuchUpload"));
 
         List<Integer> sorted = new java.util.ArrayList<>(partNumbers);
         java.util.Collections.sort(sorted);
@@ -336,34 +335,32 @@ public final class FileSystemStore implements MultipartStore {
         }
 
         byte[] body = buf.toByteArray();
-        String finalEtag = java.util.HexFormat.of().formatHex(md5OfMd5s.digest())
-            + "-" + partNumbers.size();
+        String finalEtag =
+                java.util.HexFormat.of().formatHex(md5OfMd5s.digest()) + "-" + partNumbers.size();
 
         java.util.zip.CRC32 crc = new java.util.zip.CRC32();
         crc.update(body);
-        byte[] crcBytes = new byte[]{
-            (byte) (crc.getValue() >>> 24),
-            (byte) (crc.getValue() >>> 16),
-            (byte) (crc.getValue() >>> 8),
-            (byte) crc.getValue()
-        };
+        byte[] crcBytes =
+                new byte[] {
+                    (byte) (crc.getValue() >>> 24),
+                    (byte) (crc.getValue() >>> 16),
+                    (byte) (crc.getValue() >>> 8),
+                    (byte) crc.getValue()
+                };
         String crc32 = java.util.Base64.getEncoder().encodeToString(crcBytes);
 
-        String contentType = up.contentType() != null
-            ? up.contentType() : "application/octet-stream";
+        String contentType =
+                up.contentType() != null ? up.contentType() : "application/octet-stream";
 
         try (var in = new java.io.ByteArrayInputStream(body)) {
-            putObject(bucket, up.key(), in, body.length, contentType,
-                finalEtag, crc32);
+            putObject(bucket, up.key(), in, body.length, contentType, finalEtag, crc32);
         }
 
         uploads.remove(uploadId);
         return getObject(bucket, up.key()).orElseThrow();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public void abortMultipart(String bucket, String uploadId) throws IOException {
         MultipartUpload up = uploads.remove(uploadId);
@@ -372,15 +369,13 @@ public final class FileSystemStore implements MultipartStore {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public List<MultipartUpload> listMultipartUploads(String bucket) {
         return uploads.values().stream()
-            .filter(u -> u.bucket().equals(bucket))
-            .sorted(java.util.Comparator.comparing(MultipartUpload::initiated))
-            .toList();
+                .filter(u -> u.bucket().equals(bucket))
+                .sorted(java.util.Comparator.comparing(MultipartUpload::initiated))
+                .toList();
     }
 
     /**
@@ -393,8 +388,10 @@ public final class FileSystemStore implements MultipartStore {
         int len = hex.length();
         byte[] out = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            out[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-                + Character.digit(hex.charAt(i + 1), 16));
+            out[i / 2] =
+                    (byte)
+                            ((Character.digit(hex.charAt(i), 16) << 4)
+                                    + Character.digit(hex.charAt(i + 1), 16));
         }
         return out;
     }
@@ -413,7 +410,7 @@ public final class FileSystemStore implements MultipartStore {
      * Returns the sidecar metadata file path for a given object.
      *
      * @param bucket the bucket name
-     * @param key    the object key
+     * @param key the object key
      * @return the metadata file path
      */
     private Path metaObjectPath(String bucket, String key) {

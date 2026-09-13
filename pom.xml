@@ -7,12 +7,25 @@
 
     <groupId>it.iorfino</groupId>
     <artifactId>s3forge</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
     <packaging>jar</packaging>
 
     <name>S3Forge</name>
     <description>Embedded S3 mock server in pure Java</description>
     <url>https://github.com/antonioiorfino/s3forge</url>
+
+    <developers>
+        <developer>
+            <id>antonioiorfino</id>
+            <name>Antonio Iorfino</name>
+            <email>22954589+antonioiorfino@users.noreply.github.com</email>
+            <url>https://github.com/antonioiorfino</url>
+            <roles>
+                <role>Developer</role>
+                <role>Maintainer</role>
+            </roles>
+        </developer>
+    </developers>
 
     <licenses>
         <license>
@@ -20,6 +33,12 @@
             <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
     </licenses>
+
+    <scm>
+        <url>https://github.com/antonioiorfino/s3forge</url>
+        <connection>scm:git:https://github.com/antonioiorfino/s3forge.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/antonioiorfino/s3forge.git</developerConnection>
+    </scm>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -130,6 +149,51 @@
                                 </moduleInfo>
                             </module>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>3.10.2</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>1.17.0</version>
+                            <style>AOSP</style>
+                        </googleJavaFormat>
+                        <removeUnusedImports/>
+                        <importOrder/>
+                        <formatAnnotations/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.10.4.1</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>High</threshold>
+                    <xmlOutput>true</xmlOutput>
+                    <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs-reports</spotbugsXmlOutputDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
