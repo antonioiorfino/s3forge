@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/antonioiorfino/s3forge/discussions
+    about: For questions that are not bug reports or feature requests, please use Discussions.
+  - name: Documentation
+    url: https://github.com/antonioiorfino/s3forge#readme
+    about: Check the README first — it covers supported operations and usage.

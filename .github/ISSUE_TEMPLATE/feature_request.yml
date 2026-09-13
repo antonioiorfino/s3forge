@@ -1,0 +1,73 @@
+name: Feature Request
+description: Suggest a new operation, option, or behavior for S3Forge
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please describe the use case
+        first — understanding *why* you need it helps prioritize and design.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight checklist
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: This feature is not already listed in the README's supported-operations table
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New S3 operation
+        - New configuration option
+        - New storage backend
+        - CLI / Docker
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: |
+        What problem are you trying to solve? What is the concrete scenario?
+        "I want X so that I can Y" is a good shape.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        How would you like to see this implemented? Sketch the API, the
+        CLI flag, the XML response, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        Any workarounds you currently use, or alternative designs you
+        considered.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links to AWS docs, similar implementations, related issues.
+    validations:
+      required: false

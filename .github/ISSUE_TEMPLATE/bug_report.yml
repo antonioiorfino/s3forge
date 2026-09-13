@@ -1,0 +1,109 @@
+name: Bug Report
+description: Report a reproducible problem with S3Forge
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much
+        detail as you can — a minimal reproduction is the single most useful
+        thing you can provide.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight checklist
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: I am using the latest release of S3Forge
+          required: true
+        - label: I have read the README and the supported-operations table
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: S3Forge version
+      description: Which version are you using? (e.g. 0.1.0)
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: java
+    attributes:
+      label: Java version
+      description: Output of `java -version`
+      placeholder: "openjdk version \"21.0.2\" ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Storage backend
+      options:
+        - In-memory
+        - Filesystem
+        - Both
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client used
+      description: Which client are you using against S3Forge?
+      options:
+        - AWS SDK for Java v2
+        - AWS SDK for Java v1
+        - AWS CLI
+        - curl / raw HTTP
+        - Other (described below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Minimal steps to reproduce the issue. Ideally, a small JUnit test
+        that starts S3Forge and hits the failing operation.
+      render: java
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Include stack traces or raw HTTP traces if relevant.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that might help (logs, screenshots, related issues).
+    validations:
+      required: false
