@@ -11,37 +11,73 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * In-memory implementation of {@link MultipartStore}.
+ *
+ * <p>All bucket and object data is held in {@link ConcurrentHashMap} instances and is lost when the
+ * store is discarded. This backend is intended for fast, isolated unit tests where persistence
+ * across restarts is not needed.
+ *
+ * <p>The store keeps two parallel maps per bucket:
+ *
+ * <ul>
+ *   <li>{@link #buckets} maps object keys to raw byte arrays, holding the payloads;
+ *   <li>{@link #objectMetadata} maps object keys to {@link StoredObject} instances, holding the
+ *       metadata (ETag, content type, checksum, user metadata).
+ * </ul>
+ *
+ * <p>Splitting payloads from metadata allows {@link #getObject} to return a fresh {@link
+ * ByteArrayInputStream} on every call without copying the payload on each read, while still keeping
+ * the two views consistent.
+ *
+ * <p>All operations are safe for concurrent use.
+ *
+ * @since 0.1.0
+ */
 public final class InMemoryStore implements MultipartStore {
 
-    /** bucket -> key -> bytes */
+    /** bucket -> key -> payload bytes. */
     private final Map<String, Map<String, byte[]>> buckets = new ConcurrentHashMap<>();
 
-    /** bucket -> key -> metadata */
-    private final Map<String, Map<String, StoredObject>> metadata = new ConcurrentHashMap<>();
+    /** bucket -> key -> stored metadata. */
+    private final Map<String, Map<String, StoredObject>> objectMetadata = new ConcurrentHashMap<>();
 
-    /** uploadId -> upload */
+    /** uploadId -> in-progress multipart upload. */
     private final Map<String, MultipartUpload> uploads = new ConcurrentHashMap<>();
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Creates the bucket if it does not exist. This method is idempotent.
+     */
     @Override
     public void createBucket(String bucket) {
         buckets.computeIfAbsent(bucket, k -> new ConcurrentHashMap<>());
-        metadata.computeIfAbsent(bucket, k -> new ConcurrentHashMap<>());
+        objectMetadata.computeIfAbsent(bucket, k -> new ConcurrentHashMap<>());
     }
 
+    /** {@inheritDoc} */
     @Override
     public boolean bucketExists(String bucket) {
         return buckets.containsKey(bucket);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist, or
+     *     {@code "BucketNotEmpty"} if it still contains objects
+     */
     @Override
     public void deleteBucket(String bucket) throws IOException {
         Map<String, byte[]> b = buckets.get(bucket);
         if (b == null) throw new IOException("NoSuchBucket");
         if (!b.isEmpty()) throw new IOException("BucketNotEmpty");
         buckets.remove(bucket);
-        metadata.remove(bucket);
+        objectMetadata.remove(bucket);
     }
 
+    /** {@inheritDoc} */
     @Override
     public List<String> listBuckets() {
         return new ArrayList<>(buckets.keySet());
@@ -50,9 +86,9 @@ public final class InMemoryStore implements MultipartStore {
     /**
      * {@inheritDoc}
      *
-     * <p>Stores the object payload as a defensive copy of the request bytes, alongside its metadata
-     * (ETag, content type, CRC32 checksum). This allows subsequent {@link #getObject} calls to
-     * return independent streams over the same immutable bytes.
+     * <p>Stores the payload as a defensive copy of the request bytes and records the associated
+     * metadata. The metadata map is stored as an immutable copy; callers may reuse their own map
+     * afterwards.
      */
     @Override
     public void putObject(
@@ -62,14 +98,16 @@ public final class InMemoryStore implements MultipartStore {
             long contentLength,
             String contentType,
             String etag,
-            String checksumCrc32)
+            String checksumCrc32,
+            Map<String, String> metadata)
             throws IOException {
         Map<String, byte[]> b = buckets.get(bucket);
         if (b == null) throw new IOException("NoSuchBucket");
 
         byte[] bytes = data.readAllBytes();
         b.put(key, bytes);
-        metadata.get(bucket)
+        objectMetadata
+                .get(bucket)
                 .put(
                         key,
                         new StoredObject(
@@ -80,6 +118,7 @@ public final class InMemoryStore implements MultipartStore {
                                 contentType,
                                 Instant.now(),
                                 checksumCrc32,
+                                metadata,
                                 null));
     }
 
@@ -96,7 +135,7 @@ public final class InMemoryStore implements MultipartStore {
         byte[] bytes = b.get(key);
         if (bytes == null) return Optional.empty();
 
-        StoredObject meta = metadata.get(bucket).get(key);
+        StoredObject meta = objectMetadata.get(bucket).get(key);
         return Optional.of(
                 new StoredObject(
                         bucket,
@@ -106,7 +145,37 @@ public final class InMemoryStore implements MultipartStore {
                         meta.contentType(),
                         meta.lastModified(),
                         meta.checksumCrc32(),
+                        meta.metadata(),
                         new ByteArrayInputStream(bytes)));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Removing a non-existent key is a no-op.
+     */
+    @Override
+    public void deleteObject(String bucket, String key) throws IOException {
+        Map<String, byte[]> b = buckets.get(bucket);
+        if (b == null) throw new IOException("NoSuchBucket");
+        b.remove(key);
+        objectMetadata.get(bucket).remove(key);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Non-existent keys are silently ignored.
+     */
+    @Override
+    public void deleteObjects(String bucket, List<String> keys) throws IOException {
+        Map<String, byte[]> b = buckets.get(bucket);
+        if (b == null) throw new IOException("NoSuchBucket");
+        keys.forEach(
+                k -> {
+                    b.remove(k);
+                    objectMetadata.get(bucket).remove(k);
+                });
     }
 
     /**
@@ -123,7 +192,7 @@ public final class InMemoryStore implements MultipartStore {
             int maxKeys,
             String marker,
             String continuationToken) {
-        Map<String, StoredObject> meta = metadata.get(bucket);
+        Map<String, StoredObject> meta = objectMetadata.get(bucket);
         if (meta == null) return ListResult.empty();
 
         String p = prefix == null ? "" : prefix;
@@ -173,25 +242,6 @@ public final class InMemoryStore implements MultipartStore {
         return ListResult.of(objects, commonPrefixes);
     }
 
-    @Override
-    public void deleteObject(String bucket, String key) throws IOException {
-        Map<String, byte[]> b = buckets.get(bucket);
-        if (b == null) throw new IOException("NoSuchBucket");
-        b.remove(key);
-        metadata.get(bucket).remove(key);
-    }
-
-    @Override
-    public void deleteObjects(String bucket, List<String> keys) throws IOException {
-        Map<String, byte[]> b = buckets.get(bucket);
-        if (b == null) throw new IOException("NoSuchBucket");
-        keys.forEach(
-                k -> {
-                    b.remove(k);
-                    metadata.get(bucket).remove(k);
-                });
-    }
-
     // ------------------------------------------------------------------
     // Multipart
     // ------------------------------------------------------------------
@@ -203,11 +253,12 @@ public final class InMemoryStore implements MultipartStore {
      * internal map keyed by that id.
      */
     @Override
-    public MultipartUpload initiateMultipart(String bucket, String key, String contentType)
+    public MultipartUpload initiateMultipart(
+            String bucket, String key, String contentType, Map<String, String> metadata)
             throws IOException {
         if (!bucketExists(bucket)) throw new IOException("NoSuchBucket");
         String uploadId = java.util.UUID.randomUUID().toString();
-        MultipartUpload up = new MultipartUpload(uploadId, bucket, key, contentType);
+        MultipartUpload up = new MultipartUpload(uploadId, bucket, key, contentType, metadata);
         uploads.put(uploadId, up);
         return up;
     }
@@ -234,7 +285,8 @@ public final class InMemoryStore implements MultipartStore {
      *
      * <p>Concatenates the bytes of each requested part in order. The final ETag follows the S3
      * multipart convention: the MD5 of the concatenation of the parts' binary MD5 digests, suffixed
-     * with {@code -<partCount>}.
+     * with {@code -<partCount>}. The metadata recorded at initiation time is applied to the
+     * completed object.
      */
     @Override
     public StoredObject completeMultipart(String bucket, String uploadId, List<Integer> partNumbers)
@@ -242,8 +294,7 @@ public final class InMemoryStore implements MultipartStore {
         MultipartUpload up =
                 getMultipart(bucket, uploadId).orElseThrow(() -> new IOException("NoSuchUpload"));
 
-        // Order check
-        List<Integer> sorted = new java.util.ArrayList<>(partNumbers);
+        List<Integer> sorted = new ArrayList<>(partNumbers);
         java.util.Collections.sort(sorted);
         if (!sorted.equals(partNumbers)) {
             throw new IOException("InvalidPartOrder");
@@ -261,16 +312,13 @@ public final class InMemoryStore implements MultipartStore {
             byte[] part = up.part(pn);
             if (part == null) throw new IOException("InvalidPart");
             buf.write(part);
-            // md5 of md5: digest the raw bytes of the part's own MD5
-            byte[] partMd5 = hexToBytes(up.partEtag(pn));
-            md5OfMd5s.update(partMd5);
+            md5OfMd5s.update(hexToBytes(up.partEtag(pn)));
         }
 
         byte[] body = buf.toByteArray();
         String finalEtag =
                 java.util.HexFormat.of().formatHex(md5OfMd5s.digest()) + "-" + partNumbers.size();
 
-        // Compute CRC32 of the full body so that GETs can echo it.
         java.util.zip.CRC32 crc = new java.util.zip.CRC32();
         crc.update(body);
         byte[] crcBytes =
@@ -285,15 +333,21 @@ public final class InMemoryStore implements MultipartStore {
         String contentType =
                 up.contentType() != null ? up.contentType() : "application/octet-stream";
 
-        // Persist through the existing putObject path so that both stores
-        // share the same invariants.
         try (var in = new java.io.ByteArrayInputStream(body)) {
-            putObject(bucket, up.key(), in, body.length, contentType, finalEtag, crc32);
+            putObject(
+                    bucket,
+                    up.key(),
+                    in,
+                    body.length,
+                    contentType,
+                    finalEtag,
+                    crc32,
+                    up.metadata());
         }
 
         uploads.remove(uploadId);
 
-        return metadata.get(bucket).get(up.key());
+        return objectMetadata.get(bucket).get(up.key());
     }
 
     /** {@inheritDoc} */
@@ -315,9 +369,9 @@ public final class InMemoryStore implements MultipartStore {
     }
 
     /**
-     * Converts a lowercase hex string into bytes.
+     * Converts a lowercase hex string into its byte representation.
      *
-     * @param hex the hex string
+     * @param hex the hex string; must have even length
      * @return the decoded bytes
      */
     private static byte[] hexToBytes(String hex) {

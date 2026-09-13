@@ -11,6 +11,7 @@ import it.iorfino.s3forge.xml.XmlWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.w3c.dom.Element;
 
@@ -51,7 +52,9 @@ public final class MultipartHandler {
      * {@code POST /{bucket}/{key}?uploads}
      *
      * <p>Initiates a multipart upload and returns the upload id in an {@code
-     * InitiateMultipartUploadResult} XML document.
+     * InitiateMultipartUploadResult} XML document. The content type and any standard or
+     * user-defined metadata headers present on the request are recorded with the upload and applied
+     * to the completed object.
      *
      * @param ex the HTTP exchange
      * @param bucket the bucket name
@@ -63,11 +66,13 @@ public final class MultipartHandler {
             ResponseWriter.error(ex, S3Error.NO_SUCH_BUCKET);
             return;
         }
-        String contentType = ex.getRequestHeaders().getFirst("Content-Type");
+        var reqHeaders = ex.getRequestHeaders();
+        String contentType = reqHeaders.getFirst("Content-Type");
+        Map<String, String> metadata = extractMetadata(reqHeaders);
 
         MultipartUpload up;
         try {
-            up = store.initiateMultipart(bucket, key, contentType);
+            up = store.initiateMultipart(bucket, key, contentType, metadata);
         } catch (IOException e) {
             ResponseWriter.error(ex, S3Error.INTERNAL_ERROR);
             return;
@@ -319,5 +324,38 @@ public final class MultipartHandler {
         }
         w.close("ListMultipartUploadsResult");
         ResponseWriter.xml(ex, 200, w.toString());
+    }
+
+    /** The set of standard S3 metadata headers, lowercase. */
+    private static final java.util.Set<String> STANDARD_METADATA_HEADERS =
+            java.util.Set.of(
+                    "cache-control",
+                    "content-disposition",
+                    "content-encoding",
+                    "content-language",
+                    "expires");
+
+    /**
+     * Extracts the S3 object metadata headers from a request.
+     *
+     * <p>Recognizes the five standard headers and any header whose name starts with {@code
+     * x-amz-meta-}. All keys are normalized to lowercase, matching S3 behavior. Values are returned
+     * as sent.
+     *
+     * @param req the request headers; must not be {@code null}
+     * @return a map of metadata headers, keyed by lowercase name; never {@code null}, possibly
+     *     empty
+     */
+    private static Map<String, String> extractMetadata(com.sun.net.httpserver.Headers req) {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        for (var entry : req.entrySet()) {
+            String name = entry.getKey().toLowerCase();
+            boolean standard = STANDARD_METADATA_HEADERS.contains(name);
+            boolean userMeta = name.startsWith("x-amz-meta-");
+            if (!standard && !userMeta) continue;
+            String value = entry.getValue().isEmpty() ? "" : entry.getValue().get(0);
+            out.put(name, value);
+        }
+        return out;
     }
 }
