@@ -7,7 +7,7 @@
 
     <groupId>it.iorfino</groupId>
     <artifactId>s3forge</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <name>S3Forge</name>
