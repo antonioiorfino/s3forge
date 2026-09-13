@@ -6,31 +6,77 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
+/**
+ * Filesystem-backed implementation of {@link MultipartStore}.
+ *
+ * <p>Buckets are represented as directories under a configurable root, and objects as files within
+ * those directories. Keys containing forward slashes map to nested directories, so a key {@code
+ * a/b/c.txt} becomes {@code <root>/<bucket>/a/b/c.txt} on disk.
+ *
+ * <p>Object metadata (ETag, content type, CRC32 checksum, and user metadata headers) is persisted
+ * in a sidecar {@code .properties} file under a hidden {@code
+ * .s3forge-meta/<bucket>/<key>.properties} tree, so it survives server restarts. The hidden tree is
+ * never exposed as a bucket by {@link #listBuckets()}.
+ *
+ * <p>Multipart uploads buffer their parts in memory and only write the concatenated object to disk
+ * at completion time. This keeps the implementation simple at the cost of memory proportional to
+ * the total size of in-flight multipart uploads.
+ *
+ * <p>All operations are safe for concurrent use.
+ *
+ * @since 0.1.0
+ */
 public final class FileSystemStore implements MultipartStore {
-
-    private final Path root;
-
-    /** uploadId -> upload (parts held in memory until completion) */
-    private final java.util.Map<String, MultipartUpload> uploads =
-            new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Directory name under the root that holds all sidecar metadata files. */
     private static final String META_DIR = ".s3forge-meta";
 
+    /** Root directory containing all bucket directories. */
+    private final Path root;
+
+    /** uploadId -> in-progress multipart upload (parts held in memory). */
+    private final Map<String, MultipartUpload> uploads = new ConcurrentHashMap<>();
+
+    /**
+     * Creates a new store rooted at the given directory.
+     *
+     * <p>The directory is not created here; it is created lazily by {@link #createBucket} when the
+     * first bucket is added.
+     *
+     * @param root the root directory; must not be {@code null}
+     */
     public FileSystemStore(Path root) {
         this.root = root.toAbsolutePath().normalize();
     }
 
+    /**
+     * Resolves the on-disk directory for a bucket.
+     *
+     * @param bucket the bucket name
+     * @return the bucket directory path
+     * @throws SecurityException if the resolved path escapes the root
+     */
     private Path bucketPath(String bucket) {
         Path p = root.resolve(bucket).normalize();
         if (!p.startsWith(root)) throw new SecurityException("invalid bucket");
         return p;
     }
 
+    /**
+     * Resolves the on-disk file for an object.
+     *
+     * @param bucket the bucket name
+     * @param key the object key
+     * @return the object file path
+     * @throws SecurityException if the resolved path escapes the bucket
+     */
     private Path objectPath(String bucket, String key) {
         Path p = bucketPath(bucket).resolve(key).normalize();
         if (!p.startsWith(bucketPath(bucket))) {
@@ -39,6 +85,38 @@ public final class FileSystemStore implements MultipartStore {
         return p;
     }
 
+    /**
+     * Resolves the metadata directory for a bucket.
+     *
+     * @param bucket the bucket name
+     * @return the metadata directory path
+     */
+    private Path metaBucketPath(String bucket) {
+        return root.resolve(META_DIR).resolve(bucket);
+    }
+
+    /**
+     * Resolves the sidecar metadata file for an object.
+     *
+     * @param bucket the bucket name
+     * @param key the object key
+     * @return the metadata file path
+     * @throws SecurityException if the resolved path escapes the metadata tree
+     */
+    private Path metaObjectPath(String bucket, String key) {
+        Path p = metaBucketPath(bucket).resolve(key + ".properties").normalize();
+        if (!p.startsWith(metaBucketPath(bucket))) {
+            throw new SecurityException("path traversal detected: " + key);
+        }
+        return p;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws IOException with message {@code "InvalidBucketName"} if the bucket name collides with
+     *     the reserved metadata directory
+     */
     @Override
     public void createBucket(String bucket) throws IOException {
         if (META_DIR.equals(bucket)) {
@@ -48,11 +126,19 @@ public final class FileSystemStore implements MultipartStore {
         Files.createDirectories(metaBucketPath(bucket));
     }
 
+    /** {@inheritDoc} */
     @Override
     public boolean bucketExists(String bucket) {
         return Files.isDirectory(bucketPath(bucket));
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Also removes the corresponding metadata directory on a best-effort basis. Failures to
+     * remove individual metadata files are ignored, since stale metadata for a deleted bucket is
+     * harmless.
+     */
     @Override
     public void deleteBucket(String bucket) throws IOException {
         Path b = bucketPath(bucket);
@@ -61,22 +147,28 @@ public final class FileSystemStore implements MultipartStore {
             if (entries.findAny().isPresent()) throw new IOException("BucketNotEmpty");
         }
         Files.delete(b);
-        // Best-effort cleanup of the metadata directory.
+
         Path meta = metaBucketPath(bucket);
         if (Files.isDirectory(meta)) {
             try (Stream<Path> walk = Files.walk(meta)) {
-                walk.sorted(java.util.Comparator.reverseOrder())
+                walk.sorted(Comparator.reverseOrder())
                         .forEach(
                                 p -> {
                                     try {
                                         Files.deleteIfExists(p);
                                     } catch (IOException ignored) {
+                                        /* best effort */
                                     }
                                 });
             }
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The hidden metadata directory is excluded from the listing.
+     */
     @Override
     public List<String> listBuckets() throws IOException {
         if (!Files.isDirectory(root)) return List.of();
@@ -92,9 +184,8 @@ public final class FileSystemStore implements MultipartStore {
     /**
      * {@inheritDoc}
      *
-     * <p>Writes the payload to a file under {@code <root>/<bucket>/<key>}, creating intermediate
-     * directories as needed. Metadata such as ETag, content type and CRC32 checksum is currently
-     * recomputed on read rather than persisted alongside the file.
+     * <p>Writes the payload to a file and persists the metadata to a sidecar {@code .properties}
+     * file. Existing files are replaced.
      */
     @Override
     public void putObject(
@@ -104,24 +195,24 @@ public final class FileSystemStore implements MultipartStore {
             long contentLength,
             String contentType,
             String etag,
-            String checksumCrc32)
+            String checksumCrc32,
+            Map<String, String> metadata)
             throws IOException {
         Path p = objectPath(bucket, key);
         Files.createDirectories(p.getParent());
         Files.copy(data, p, StandardCopyOption.REPLACE_EXISTING);
 
-        new ObjectMetadata(etag, contentType, checksumCrc32).write(metaObjectPath(bucket, key));
+        new ObjectMetadata(etag, contentType, checksumCrc32, metadata)
+                .write(metaObjectPath(bucket, key));
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Reads the file size, content type and last-modified timestamp from the filesystem. The
-     * ETag and CRC32 checksum are left empty: without a sidecar metadata file they cannot be
-     * recovered after a restart, and recomputing them here would require reading the whole payload.
-     *
-     * <p>This is acceptable for integration testing, where clients typically upload and immediately
-     * read back within the same run. Persisting metadata is tracked as a future enhancement.
+     * <p>Reads the payload size, last-modified timestamp, and all metadata fields from the sidecar
+     * file. If no sidecar exists (for example, for objects created before metadata persistence was
+     * introduced), the content type is probed from the filesystem and the other fields are left
+     * empty.
      */
     @Override
     public Optional<StoredObject> getObject(String bucket, String key) throws IOException {
@@ -141,16 +232,23 @@ public final class FileSystemStore implements MultipartStore {
                         contentType,
                         Files.getLastModifiedTime(p).toInstant(),
                         meta.checksumCrc32(),
+                        meta.metadata(),
                         Files.newInputStream(p)));
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Removes both the object file and its sidecar metadata file, and prunes any now-empty
+     * intermediate directories in both trees.
+     */
     @Override
     public void deleteObject(String bucket, String key) throws IOException {
         Path p = objectPath(bucket, key);
         Files.deleteIfExists(p);
         ObjectMetadata.delete(metaObjectPath(bucket, key));
 
-        // Clean up empty intermediate directories in the object tree.
+        // Prune empty intermediate directories in the object tree.
         Path parent = p.getParent();
         Path b = bucketPath(bucket);
         while (parent != null && !parent.equals(b) && Files.isDirectory(parent)) {
@@ -161,7 +259,7 @@ public final class FileSystemStore implements MultipartStore {
             parent = parent.getParent();
         }
 
-        // Same cleanup in the metadata tree.
+        // Prune empty intermediate directories in the metadata tree.
         Path metaParent = metaObjectPath(bucket, key).getParent();
         Path metaBucket = metaBucketPath(bucket);
         while (metaParent != null
@@ -175,6 +273,7 @@ public final class FileSystemStore implements MultipartStore {
         }
     }
 
+    /** {@inheritDoc} */
     @Override
     public void deleteObjects(String bucket, List<String> keys) throws IOException {
         for (String k : keys) deleteObject(bucket, k);
@@ -187,12 +286,8 @@ public final class FileSystemStore implements MultipartStore {
      * (with forward slashes) starts with the given prefix. Keys are then sorted lexicographically
      * and filtered through the optional delimiter, grouping matching keys into common prefixes.
      *
-     * <p>Because the filesystem backend does not persist sidecar metadata, the ETag and CRC32
-     * checksum fields are left empty in the returned summaries. Clients that need these values
-     * should perform a {@code GET} or {@code HEAD} on the specific object.
-     *
-     * <p>The returned {@link StoredObject} instances are summaries: their {@code data} field is
-     * always {@code null}.
+     * <p>Metadata for each listed object is read from its sidecar file, so the returned summaries
+     * carry the same metadata as a full {@link #getObject} would.
      */
     @Override
     public ListResult listObjects(
@@ -209,7 +304,6 @@ public final class FileSystemStore implements MultipartStore {
         String p = prefix == null ? "" : prefix;
         String startAfter = continuationToken != null ? continuationToken : marker;
 
-        // Collect all matching keys in lexicographic order.
         List<String> keys = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(b)) {
             walk.filter(Files::isRegularFile)
@@ -262,6 +356,7 @@ public final class FileSystemStore implements MultipartStore {
                                 contentType,
                                 Files.getLastModifiedTime(file).toInstant(),
                                 m.checksumCrc32(),
+                                m.metadata(),
                                 null));
             }
             lastEmitted = entry;
@@ -278,15 +373,15 @@ public final class FileSystemStore implements MultipartStore {
      * {@inheritDoc}
      *
      * <p>Part payloads are buffered in memory until the upload is completed, at which point the
-     * concatenated object is written to disk via {@link #putObject}. This keeps the implementation
-     * simple at the cost of memory proportional to the total size of in-flight multipart uploads.
+     * concatenated object is written to disk via {@link #putObject}.
      */
     @Override
-    public MultipartUpload initiateMultipart(String bucket, String key, String contentType)
+    public MultipartUpload initiateMultipart(
+            String bucket, String key, String contentType, Map<String, String> metadata)
             throws IOException {
         if (!bucketExists(bucket)) throw new IOException("NoSuchBucket");
         String uploadId = java.util.UUID.randomUUID().toString();
-        MultipartUpload up = new MultipartUpload(uploadId, bucket, key, contentType);
+        MultipartUpload up = new MultipartUpload(uploadId, bucket, key, contentType, metadata);
         uploads.put(uploadId, up);
         return up;
     }
@@ -308,14 +403,20 @@ public final class FileSystemStore implements MultipartStore {
         up.putPart(partNumber, data, etag);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Buffers the concatenation in memory, computes the S3 multipart ETag and CRC32, and writes
+     * the result to disk through {@link #putObject}. The metadata recorded at initiation time is
+     * applied to the completed object.
+     */
     @Override
     public StoredObject completeMultipart(String bucket, String uploadId, List<Integer> partNumbers)
             throws IOException {
         MultipartUpload up =
                 getMultipart(bucket, uploadId).orElseThrow(() -> new IOException("NoSuchUpload"));
 
-        List<Integer> sorted = new java.util.ArrayList<>(partNumbers);
+        List<Integer> sorted = new ArrayList<>(partNumbers);
         java.util.Collections.sort(sorted);
         if (!sorted.equals(partNumbers)) throw new IOException("InvalidPartOrder");
 
@@ -353,7 +454,15 @@ public final class FileSystemStore implements MultipartStore {
                 up.contentType() != null ? up.contentType() : "application/octet-stream";
 
         try (var in = new java.io.ByteArrayInputStream(body)) {
-            putObject(bucket, up.key(), in, body.length, contentType, finalEtag, crc32);
+            putObject(
+                    bucket,
+                    up.key(),
+                    in,
+                    body.length,
+                    contentType,
+                    finalEtag,
+                    crc32,
+                    up.metadata());
         }
 
         uploads.remove(uploadId);
@@ -374,14 +483,14 @@ public final class FileSystemStore implements MultipartStore {
     public List<MultipartUpload> listMultipartUploads(String bucket) {
         return uploads.values().stream()
                 .filter(u -> u.bucket().equals(bucket))
-                .sorted(java.util.Comparator.comparing(MultipartUpload::initiated))
+                .sorted(Comparator.comparing(MultipartUpload::initiated))
                 .toList();
     }
 
     /**
-     * Converts a lowercase hex string into bytes.
+     * Converts a lowercase hex string into its byte representation.
      *
-     * @param hex the hex string
+     * @param hex the hex string; must have even length
      * @return the decoded bytes
      */
     private static byte[] hexToBytes(String hex) {
@@ -394,30 +503,5 @@ public final class FileSystemStore implements MultipartStore {
                                     + Character.digit(hex.charAt(i + 1), 16));
         }
         return out;
-    }
-
-    /**
-     * Returns the path of the metadata directory for a given bucket.
-     *
-     * @param bucket the bucket name
-     * @return the metadata directory path
-     */
-    private Path metaBucketPath(String bucket) {
-        return root.resolve(META_DIR).resolve(bucket);
-    }
-
-    /**
-     * Returns the sidecar metadata file path for a given object.
-     *
-     * @param bucket the bucket name
-     * @param key the object key
-     * @return the metadata file path
-     */
-    private Path metaObjectPath(String bucket, String key) {
-        Path p = metaBucketPath(bucket).resolve(key + ".properties").normalize();
-        if (!p.startsWith(metaBucketPath(bucket))) {
-            throw new SecurityException("path traversal detected: " + key);
-        }
-        return p;
     }
 }

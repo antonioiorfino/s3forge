@@ -7,16 +7,14 @@ import it.iorfino.s3forge.support.AwsClientFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.*;
 
 /**
  * Verifies that object metadata (ETag, content type, CRC32 checksum) is persisted to sidecar files
@@ -188,5 +186,69 @@ class FileSystemMetadataTest {
         assertTrue(names.contains("visible"));
         assertTrue(
                 !names.contains(".s3forge-meta"), "Metadata directory must not appear as a bucket");
+    }
+
+    /**
+     * Verifies that object metadata headers survive a server restart when the filesystem backend is
+     * used, since they are reloaded from the sidecar file.
+     *
+     * @throws IOException if the second server fails to start
+     */
+    @Test
+    void metadataSurvivesRestart() throws IOException {
+        client.createBucket(CreateBucketRequest.builder().bucket("metasurv").build());
+        client.putObject(
+                PutObjectRequest.builder()
+                        .bucket("metasurv")
+                        .key("doc.txt")
+                        .cacheControl("max-age=7200")
+                        .contentDisposition("inline")
+                        .metadata(Map.of("tenant", "acme", "env", "test"))
+                        .build(),
+                RequestBody.fromString("persistent"));
+
+        // Restart on the same root.
+        forge.close();
+        client.close();
+        forge = S3Forge.builder().port(0).fileSystem(root).build();
+        forge.start();
+        client = AwsClientFactory.forPort(forge.port());
+
+        HeadObjectResponse head =
+                client.headObject(
+                        HeadObjectRequest.builder().bucket("metasurv").key("doc.txt").build());
+
+        assertEquals("max-age=7200", head.cacheControl());
+        assertEquals("inline", head.contentDisposition());
+        assertEquals("acme", head.metadata().get("tenant"));
+        assertEquals("test", head.metadata().get("env"));
+    }
+
+    /**
+     * Verifies that reading metadata from a non-existent sidecar file returns an empty record
+     * rather than failing, so that objects created before sidecar persistence was introduced remain
+     * readable.
+     */
+    @Test
+    void missingSidecarReturnsEmptyMetadata() throws IOException {
+        // Create a bucket directory and an object file manually, bypassing
+        // the store, to simulate a pre-existing object without a sidecar.
+        Path bucketDir = root.resolve("legacy");
+        Files.createDirectories(bucketDir);
+        Files.writeString(bucketDir.resolve("old.txt"), "legacy content");
+
+        // The store must still serve it, with empty metadata.
+        try (S3Forge fsForge = S3Forge.builder().port(0).fileSystem(root).build()) {
+            fsForge.start();
+            try (S3Client fsClient = AwsClientFactory.forPort(fsForge.port())) {
+                HeadObjectResponse head =
+                        fsClient.headObject(
+                                HeadObjectRequest.builder()
+                                        .bucket("legacy")
+                                        .key("old.txt")
+                                        .build());
+                assertEquals(0, head.metadata().size());
+            }
+        }
     }
 }

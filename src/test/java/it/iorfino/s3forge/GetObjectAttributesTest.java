@@ -13,14 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectAttributesRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectAttributesResponse;
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
-import software.amazon.awssdk.services.s3.model.ObjectAttributes;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.*;
 
 /**
  * Tests for the {@code GetObjectAttributes} operation.
@@ -185,5 +178,38 @@ class GetObjectAttributesTest {
                                         .key("missing.txt")
                                         .objectAttributes(ObjectAttributes.E_TAG)
                                         .build()));
+    }
+
+    /**
+     * Verifies that non-metadata headers on a request are ignored by the server, so that spurious
+     * headers do not leak into the object's metadata map.
+     *
+     * <p>Uses a raw HTTP client because the AWS SDK does not allow setting arbitrary headers that
+     * are not part of its model.
+     *
+     * @throws Exception if the HTTP exchange fails
+     */
+    @Test
+    void nonMetadataHeadersAreIgnored() throws Exception {
+        var request =
+                new org.apache.hc.client5.http.classic.methods.HttpPut(
+                        java.net.URI.create(
+                                "http://localhost:"
+                                        + forge.port()
+                                        + "/"
+                                        + BUCKET
+                                        + "/spurious.txt"));
+        request.setHeader("Host", "localhost:" + forge.port());
+        request.setHeader("X-Custom-Header", "should-be-ignored");
+        request.setEntity(new org.apache.hc.core5.http.io.entity.StringEntity("x"));
+
+        try (var response = rawClient.executeOpen(null, request, null)) {
+            assertEquals(200, response.getCode());
+        }
+
+        HeadObjectResponse head =
+                client.headObject(
+                        HeadObjectRequest.builder().bucket(BUCKET).key("spurious.txt").build());
+        assertEquals(0, head.metadata().size());
     }
 }

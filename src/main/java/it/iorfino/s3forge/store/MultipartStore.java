@@ -2,6 +2,7 @@ package it.iorfino.s3forge.store;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -27,13 +28,26 @@ public interface MultipartStore extends Store {
     /**
      * Initiates a new multipart upload.
      *
+     * <p>The content type and metadata map supplied here are recorded with the upload and applied
+     * to the completed object when {@link #completeMultipart} is called. This matches the behavior
+     * of real S3, where the {@code CreateMultipartUpload} request carries the object metadata and
+     * the individual {@code UploadPart} requests do not.
+     *
+     * <p>The {@code metadata} map holds the S3 object metadata headers: the five standard headers
+     * ({@code cache-control}, {@code content-disposition}, {@code content-encoding}, {@code
+     * content-language}, {@code expires}) and any user-defined {@code x-amz-meta-*} entries. Keys
+     * must be lowercase. The map may be {@code null}, in which case it is treated as empty.
+     *
      * @param bucket the destination bucket; must exist
      * @param key the destination key; must not be {@code null}
      * @param contentType the MIME type to assign at completion, or {@code null} for a default
+     * @param metadata object metadata headers, lowercase keys; may be {@code null} (treated as
+     *     empty)
      * @return the newly created upload state; never {@code null}
      * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist
      */
-    MultipartUpload initiateMultipart(String bucket, String key, String contentType)
+    MultipartUpload initiateMultipart(
+            String bucket, String key, String contentType, Map<String, String> metadata)
             throws IOException;
 
     /**

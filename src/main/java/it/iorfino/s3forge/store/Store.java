@@ -3,6 +3,7 @@ package it.iorfino.s3forge.store;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -75,9 +76,14 @@ public interface Store {
      * <p>The stream is fully consumed by this call; callers must not rely on it being readable
      * afterwards.
      *
-     * <p>The {@code etag} and {@code checksumCrc32} parameters are computed by the HTTP layer (see
-     * {@code ObjectHandler}) and stored verbatim so that subsequent {@code GET} and {@code HEAD}
-     * requests can return them without recomputation.
+     * <p>The {@code etag}, {@code checksumCrc32} and {@code metadata} parameters are computed by
+     * the HTTP layer (see {@code ObjectHandler}) and stored verbatim so that subsequent {@code GET}
+     * and {@code HEAD} requests can return them without recomputation.
+     *
+     * <p>The {@code metadata} map holds the S3 object metadata headers: the five standard headers
+     * ({@code cache-control}, {@code content-disposition}, {@code content-encoding}, {@code
+     * content-language}, {@code expires}) and any user-defined {@code x-amz-meta-*} entries. Keys
+     * must be lowercase. The map may be {@code null}, in which case it is treated as empty.
      *
      * @param bucket the target bucket; must exist
      * @param key the object key; must not be {@code null}
@@ -85,10 +91,11 @@ public interface Store {
      * @param contentLength the payload length in bytes, or {@code -1} if unknown
      * @param contentType the MIME type, or {@code null} for a default
      * @param etag the pre-computed ETag value (hex MD5, without surrounding quotes), or {@code
-     *     null} if not applicable
-     * @param checksumCrc32 the pre-computed CRC32 checksum encoded as a Base64 string in big-endian
-     *     form (as required by the S3 {@code x-amz-checksum-crc32} header), or {@code null} if not
-     *     available
+     *     null}
+     * @param checksumCrc32 the pre-computed CRC32 checksum encoded as a Base64 big-endian string,
+     *     or {@code null}
+     * @param metadata object metadata headers, lowercase keys; may be {@code null} (treated as
+     *     empty)
      * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist, or on
      *     any I/O error
      */
@@ -99,7 +106,8 @@ public interface Store {
             long contentLength,
             String contentType,
             String etag,
-            String checksumCrc32)
+            String checksumCrc32,
+            Map<String, String> metadata)
             throws IOException;
 
     /**

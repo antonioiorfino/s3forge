@@ -12,7 +12,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * bucket and key. Parts are stored keyed by their 1-based part number; the S3 API allows up to
  * 10,000 parts per upload.
  *
- * <p>This class is thread-safe: parts may be uploaded concurrently, and the map is backed by a
+ * <p>The content type and metadata map recorded at initiation time are applied to the completed
+ * object when {@link MultipartStore#completeMultipart} is called, matching the behavior of real S3
+ * where the {@code CreateMultipartUpload} request carries the object metadata.
+ *
+ * <p>This class is thread-safe: parts may be uploaded concurrently, and the maps are backed by
  * {@link ConcurrentHashMap}. Ordering is enforced at completion time by iterating a {@link TreeMap}
  * view.
  *
@@ -27,6 +31,7 @@ public final class MultipartUpload {
     private final String bucket;
     private final String key;
     private final String contentType;
+    private final Map<String, String> metadata;
     private final Instant initiated;
 
     private final Map<Integer, byte[]> parts = new ConcurrentHashMap<>();
@@ -39,12 +44,20 @@ public final class MultipartUpload {
      * @param bucket the destination bucket
      * @param key the destination key
      * @param contentType the MIME type to assign at completion, or {@code null} for a default
+     * @param metadata object metadata headers to assign at completion, lowercase keys; may be
+     *     {@code null} (treated as empty)
      */
-    public MultipartUpload(String uploadId, String bucket, String key, String contentType) {
+    public MultipartUpload(
+            String uploadId,
+            String bucket,
+            String key,
+            String contentType,
+            Map<String, String> metadata) {
         this.uploadId = uploadId;
         this.bucket = bucket;
         this.key = key;
         this.contentType = contentType;
+        this.metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
         this.initiated = Instant.now();
     }
 
@@ -82,6 +95,16 @@ public final class MultipartUpload {
      */
     public String contentType() {
         return contentType;
+    }
+
+    /**
+     * Returns the metadata headers to assign to the completed object.
+     *
+     * @return an immutable map of metadata headers, lowercase keys; never {@code null}, possibly
+     *     empty
+     */
+    public Map<String, String> metadata() {
+        return metadata;
     }
 
     /**
@@ -140,7 +163,7 @@ public final class MultipartUpload {
     }
 
     /**
-     * Returns the sorted set of part numbers received so far.
+     * Returns a snapshot of the parts received so far, keyed by part number and ordered ascending.
      *
      * @return a sorted map view of parts; never {@code null}
      */
@@ -149,7 +172,8 @@ public final class MultipartUpload {
     }
 
     /**
-     * Returns the sorted set of part numbers and their ETags.
+     * Returns a snapshot of the part ETags received so far, keyed by part number and ordered
+     * ascending.
      *
      * @return a sorted map of part ETags; never {@code null}
      */
