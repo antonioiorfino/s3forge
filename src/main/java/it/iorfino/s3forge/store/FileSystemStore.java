@@ -196,13 +196,14 @@ public final class FileSystemStore implements MultipartStore {
             String contentType,
             String etag,
             String checksumCrc32,
-            Map<String, String> metadata)
+            Map<String, String> metadata,
+            List<PartInfo> parts)
             throws IOException {
         Path p = objectPath(bucket, key);
         Files.createDirectories(p.getParent());
         Files.copy(data, p, StandardCopyOption.REPLACE_EXISTING);
 
-        new ObjectMetadata(etag, contentType, checksumCrc32, metadata)
+        new ObjectMetadata(etag, contentType, checksumCrc32, metadata, parts)
                 .write(metaObjectPath(bucket, key));
     }
 
@@ -233,6 +234,7 @@ public final class FileSystemStore implements MultipartStore {
                         Files.getLastModifiedTime(p).toInstant(),
                         meta.checksumCrc32(),
                         meta.metadata(),
+                        meta.parts(),
                         Files.newInputStream(p)));
     }
 
@@ -357,6 +359,7 @@ public final class FileSystemStore implements MultipartStore {
                                 Files.getLastModifiedTime(file).toInstant(),
                                 m.checksumCrc32(),
                                 m.metadata(),
+                                m.parts(),
                                 null));
             }
             lastEmitted = entry;
@@ -407,8 +410,8 @@ public final class FileSystemStore implements MultipartStore {
      * {@inheritDoc}
      *
      * <p>Buffers the concatenation in memory, computes the S3 multipart ETag and CRC32, and writes
-     * the result to disk through {@link #putObject}. The metadata recorded at initiation time is
-     * applied to the completed object.
+     * the result to disk through {@link #putObject}. The metadata and part descriptors recorded at
+     * initiation and upload time are applied to the completed object.
      */
     @Override
     public StoredObject completeMultipart(String bucket, String uploadId, List<Integer> partNumbers)
@@ -428,11 +431,16 @@ public final class FileSystemStore implements MultipartStore {
             throw new IllegalStateException("MD5 not available", e);
         }
 
+        List<PartInfo> partInfos = new ArrayList<>(partNumbers.size());
+        long offset = 0;
+
         for (int pn : partNumbers) {
             byte[] part = up.part(pn);
             if (part == null) throw new IOException("InvalidPart");
             buf.write(part);
             md5OfMd5s.update(hexToBytes(up.partEtag(pn)));
+            partInfos.add(new PartInfo(pn, offset, part.length, up.partEtag(pn)));
+            offset += part.length;
         }
 
         byte[] body = buf.toByteArray();
@@ -462,7 +470,8 @@ public final class FileSystemStore implements MultipartStore {
                     contentType,
                     finalEtag,
                     crc32,
-                    up.metadata());
+                    up.metadata(),
+                    partInfos);
         }
 
         uploads.remove(uploadId);

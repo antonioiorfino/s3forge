@@ -354,4 +354,33 @@ class FileSystemStoreTest {
         assertEquals(List.of("top.txt"), keys);
         assertEquals(List.of("a/", "b/"), prefixes);
     }
+
+    @Test
+    void batchDeleteWorksOnFilesystem() {
+        client.createBucket(CreateBucketRequest.builder().bucket("batch-fs").build());
+        client.putObject(
+                PutObjectRequest.builder().bucket("batch-fs").key("a.txt").build(),
+                RequestBody.fromString("a"));
+        client.putObject(
+                PutObjectRequest.builder().bucket("batch-fs").key("b.txt").build(),
+                RequestBody.fromString("b"));
+
+        var res =
+                client.deleteObjects(
+                        DeleteObjectsRequest.builder()
+                                .bucket("batch-fs")
+                                .delete(
+                                        Delete.builder()
+                                                .objects(
+                                                        ObjectIdentifier.builder()
+                                                                .key("a.txt")
+                                                                .build(),
+                                                        ObjectIdentifier.builder()
+                                                                .key("b.txt")
+                                                                .build())
+                                                .build())
+                                .build());
+
+        assertEquals(2, res.deleted().size());
+    }
 }

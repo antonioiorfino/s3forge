@@ -190,4 +190,13 @@ class ListObjectsTest {
         assertEquals(1, page3.contents().size());
         assertFalse(page3.isTruncated());
     }
+
+    @Test
+    void emptyBucketReturnsEmptyListResult() {
+        // A fresh bucket with no objects must yield a ListResult.empty()
+        // from both backends.
+        var res = client.listObjectsV2(ListObjectsV2Request.builder().bucket(BUCKET).build());
+        assertEquals(0, res.keyCount());
+        assertFalse(res.isTruncated());
+    }
 }

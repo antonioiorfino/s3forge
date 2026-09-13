@@ -76,14 +76,19 @@ public interface Store {
      * <p>The stream is fully consumed by this call; callers must not rely on it being readable
      * afterwards.
      *
-     * <p>The {@code etag}, {@code checksumCrc32} and {@code metadata} parameters are computed by
-     * the HTTP layer (see {@code ObjectHandler}) and stored verbatim so that subsequent {@code GET}
-     * and {@code HEAD} requests can return them without recomputation.
+     * <p>The {@code etag}, {@code checksumCrc32}, {@code metadata} and {@code parts} parameters are
+     * computed by the HTTP layer (see {@code ObjectHandler} and {@code MultipartHandler}) and
+     * stored verbatim so that subsequent {@code GET} and {@code HEAD} requests can return them
+     * without recomputation.
      *
      * <p>The {@code metadata} map holds the S3 object metadata headers: the five standard headers
      * ({@code cache-control}, {@code content-disposition}, {@code content-encoding}, {@code
      * content-language}, {@code expires}) and any user-defined {@code x-amz-meta-*} entries. Keys
      * must be lowercase. The map may be {@code null}, in which case it is treated as empty.
+     *
+     * <p>The {@code parts} list is non-empty only for objects assembled from a multipart upload. It
+     * records each part's number, byte range and ETag, enabling {@code GetObject?partNumber=N}. For
+     * single-part objects it may be {@code null} or empty.
      *
      * @param bucket the target bucket; must exist
      * @param key the object key; must not be {@code null}
@@ -96,6 +101,7 @@ public interface Store {
      *     or {@code null}
      * @param metadata object metadata headers, lowercase keys; may be {@code null} (treated as
      *     empty)
+     * @param parts multipart part descriptors, or {@code null}/empty for single-part objects
      * @throws IOException with message {@code "NoSuchBucket"} if the bucket does not exist, or on
      *     any I/O error
      */
@@ -107,7 +113,8 @@ public interface Store {
             String contentType,
             String etag,
             String checksumCrc32,
-            Map<String, String> metadata)
+            Map<String, String> metadata,
+            List<PartInfo> parts)
             throws IOException;
 
     /**

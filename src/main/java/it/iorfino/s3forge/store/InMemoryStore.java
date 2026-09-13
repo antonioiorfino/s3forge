@@ -99,7 +99,8 @@ public final class InMemoryStore implements MultipartStore {
             String contentType,
             String etag,
             String checksumCrc32,
-            Map<String, String> metadata)
+            Map<String, String> metadata,
+            List<PartInfo> parts)
             throws IOException {
         Map<String, byte[]> b = buckets.get(bucket);
         if (b == null) throw new IOException("NoSuchBucket");
@@ -119,6 +120,7 @@ public final class InMemoryStore implements MultipartStore {
                                 Instant.now(),
                                 checksumCrc32,
                                 metadata,
+                                parts,
                                 null));
     }
 
@@ -126,7 +128,8 @@ public final class InMemoryStore implements MultipartStore {
      * {@inheritDoc}
      *
      * <p>Returns a fresh {@link ByteArrayInputStream} over the stored bytes on every call, so that
-     * concurrent readers do not interfere with each other.
+     * concurrent readers do not interfere with each other. The multipart part descriptors recorded
+     * at upload time are carried through unchanged.
      */
     @Override
     public Optional<StoredObject> getObject(String bucket, String key) {
@@ -146,6 +149,7 @@ public final class InMemoryStore implements MultipartStore {
                         meta.lastModified(),
                         meta.checksumCrc32(),
                         meta.metadata(),
+                        meta.parts(),
                         new ByteArrayInputStream(bytes)));
     }
 
@@ -286,7 +290,8 @@ public final class InMemoryStore implements MultipartStore {
      * <p>Concatenates the bytes of each requested part in order. The final ETag follows the S3
      * multipart convention: the MD5 of the concatenation of the parts' binary MD5 digests, suffixed
      * with {@code -<partCount>}. The metadata recorded at initiation time is applied to the
-     * completed object.
+     * completed object, and a {@link PartInfo} entry is recorded for each part so that subsequent
+     * {@code GetObject?partNumber=N} requests can resolve byte ranges.
      */
     @Override
     public StoredObject completeMultipart(String bucket, String uploadId, List<Integer> partNumbers)
@@ -307,12 +312,16 @@ public final class InMemoryStore implements MultipartStore {
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException("MD5 not available", e);
         }
+        List<PartInfo> partInfos = new ArrayList<>(partNumbers.size());
+        long offset = 0;
 
         for (int pn : partNumbers) {
             byte[] part = up.part(pn);
             if (part == null) throw new IOException("InvalidPart");
             buf.write(part);
             md5OfMd5s.update(hexToBytes(up.partEtag(pn)));
+            partInfos.add(new PartInfo(pn, offset, part.length, up.partEtag(pn)));
+            offset += part.length;
         }
 
         byte[] body = buf.toByteArray();
@@ -342,7 +351,8 @@ public final class InMemoryStore implements MultipartStore {
                     contentType,
                     finalEtag,
                     crc32,
-                    up.metadata());
+                    up.metadata(),
+                    partInfos);
         }
 
         uploads.remove(uploadId);
