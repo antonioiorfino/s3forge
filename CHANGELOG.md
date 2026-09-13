@@ -7,6 +7,13 @@ and this project adheres to Semantic Versioning (https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Support for standard object metadata headers on `PutObject`,
+  `GetObject`, `HeadObject`, and `CopyObject`: `Cache-Control`,
+  `Content-Disposition`, `Content-Encoding`, `Content-Language`,
+  `Expires`, and user-defined `x-amz-meta-*` entries (#5).
+
 ## [0.1.0] - 2026-09-13
 
 ### Added
