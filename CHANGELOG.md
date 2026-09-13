@@ -7,6 +7,8 @@ and this project adheres to Semantic Versioning (https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-13
+
 ### Added
 
 - Support for standard object metadata headers on `PutObject`,
@@ -22,6 +24,9 @@ and this project adheres to Semantic Versioning (https://semver.org/).
 
 - Dead duplicate `AwsChunkedDecoder` in the `http` package; the
   canonical implementation lives in `util`.
+
+[Unreleased]: https://github.com/antonioiorfino/s3forge/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/antonioiorfino/s3forge/releases/tag/v0.2.0
 
 ## [0.1.0] - 2026-09-13
 
