@@ -4,13 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import it.iorfino.s3forge.S3Forge;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-
-import it.iorfino.s3forge.S3Forge;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -88,7 +87,8 @@ class MainTest {
         } finally {
             System.setOut(originalOut);
         }
-        assertTrue(buffer.toString(StandardCharsets.UTF_8).isEmpty(),
-            "Library must not write to stdout: " + buffer);
+        assertTrue(
+                buffer.toString(StandardCharsets.UTF_8).isEmpty(),
+                "Library must not write to stdout: " + buffer);
     }
 }

@@ -5,10 +5,9 @@ import java.io.PrintStream;
 /**
  * ASCII banner printed by the command-line launcher at startup.
  *
- * <p>Intentionally minimal: a fixed ASCII art, the version string, and a
- * one-line summary. The banner is not printed by the embedded library
- * API ({@link it.iorfino.s3forge.S3Forge}), only by the CLI, so that tests
- * using S3Forge never see it in their output.</p>
+ * <p>Intentionally minimal: a fixed ASCII art, the version string, and a one-line summary. The
+ * banner is not printed by the embedded library API ({@link it.iorfino.s3forge.S3Forge}), only by
+ * the CLI, so that tests using S3Forge never see it in their output.
  *
  * @since 0.3.0
  */
@@ -27,7 +26,8 @@ final class Banner {
         String version = version();
         boolean tty = System.console() != null;
         if (tty) {
-            out.println("""
+            out.println(
+                    """
                 ███████╗██████╗ ███████╗ ██████╗ ██████╗  ██████╗ ███████╗
                 ██╔════╝╚════██╗██╔════╝██╔═══██╗██╔══██╗██╔════╝ ██╔════╝
                 ███████╗ █████╔╝█████╗  ██║   ██║██████╔╝██║  ███╗█████╗
@@ -43,8 +43,8 @@ final class Banner {
     }
 
     /**
-     * Returns the S3Forge version, read from the JAR manifest when running
-     * from a packaged JAR, or {@code "dev"} otherwise.
+     * Returns the S3Forge version, read from the JAR manifest when running from a packaged JAR, or
+     * {@code "dev"} otherwise.
      *
      * @return the version string; never {@code null}
      */
