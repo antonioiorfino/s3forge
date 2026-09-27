@@ -12,7 +12,7 @@ import java.nio.file.Path;
  *
  * <p>S3Forge is a lightweight, framework-free implementation of a subset of the AWS S3 HTTP API,
  * designed for integration testing of applications that talk to S3 without hitting real AWS
- * endpoints. It runs entirely on the JDK 21 standard library, using {@link
+ * endpoints. It runs entirely on the JDK 25 standard library, using {@link
  * com.sun.net.httpserver.HttpServer} for the HTTP layer and virtual threads for request handling.
  *
  * <p>Two storage backends are supported:

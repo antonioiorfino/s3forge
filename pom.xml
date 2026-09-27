@@ -41,7 +41,7 @@
     </scm>
 
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <junit.version>6.1.3</junit.version>
@@ -61,7 +61,7 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- ZERO dipendenze runtime: solo JDK 21 -->
+        <!-- ZERO dipendenze runtime: solo JDK 25 -->
 
         <!-- Test -->
         <dependency>
@@ -105,6 +105,13 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.5.1</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -141,7 +148,7 @@
                         </goals>
                         <configuration>
                             <overwriteExistingFiles>true</overwriteExistingFiles>
-                            <jvmVersion>21</jvmVersion>
+                            <jvmVersion>25</jvmVersion>
                             <module>
                                 <moduleInfo>
                                     <name>it.iorfino</name>
@@ -155,11 +162,11 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>3.10.2</version>
+                <version>3.10.3</version>
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>1.17.0</version>
+                            <version>1.36.1</version>
                             <style>AOSP</style>
                         </googleJavaFormat>
                         <removeUnusedImports/>

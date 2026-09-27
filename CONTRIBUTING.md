@@ -10,7 +10,7 @@ Code of Conduct. Be kind, be patient, assume good faith.
 
 ## Prerequisites
 
-- JDK 21
+- JDK 25
 - Maven 3.9+
 
 ## Building

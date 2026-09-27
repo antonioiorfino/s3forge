@@ -4,7 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+
+import it.iorfino.s3forge.S3Forge;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -61,5 +67,28 @@ class MainTest {
     void helpFlagIsParsed() {
         Map<String, String> m = Main.parseArgs(new String[] {"--help"});
         assertTrue(m.containsKey("help"));
+    }
+
+    @Test
+    void bannerContainsVersionAndName() {
+        var buffer = new ByteArrayOutputStream();
+        Banner.print(new PrintStream(buffer, true, StandardCharsets.UTF_8));
+        String output = buffer.toString(StandardCharsets.UTF_8);
+        assertTrue(output.contains("S3Forge"));
+        assertTrue(output.contains("dev")); // no version in test environment
+    }
+
+    @Test
+    void embeddedLibraryDoesNotPrintBanner() throws IOException {
+        var originalOut = System.out;
+        var buffer = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(buffer, true, StandardCharsets.UTF_8));
+        try (S3Forge forge = S3Forge.builder().port(0).inMemory().build()) {
+            forge.start();
+        } finally {
+            System.setOut(originalOut);
+        }
+        assertTrue(buffer.toString(StandardCharsets.UTF_8).isEmpty(),
+            "Library must not write to stdout: " + buffer);
     }
 }

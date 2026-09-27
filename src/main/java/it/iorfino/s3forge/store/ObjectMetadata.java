@@ -122,10 +122,12 @@ public record ObjectMetadata(
             }
             String value = p.getProperty(name);
             switch (bits[1]) {
-                case "startOffset" -> offsetsAndSizes.computeIfAbsent(n, k -> new long[2])[0] =
-                        Long.parseLong(value);
-                case "size" -> offsetsAndSizes.computeIfAbsent(n, k -> new long[2])[1] =
-                        Long.parseLong(value);
+                case "startOffset" ->
+                        offsetsAndSizes.computeIfAbsent(n, k -> new long[2])[0] =
+                                Long.parseLong(value);
+                case "size" ->
+                        offsetsAndSizes.computeIfAbsent(n, k -> new long[2])[1] =
+                                Long.parseLong(value);
                 case "etag" -> etags.put(n, value);
                 default -> {
                     /* ignore unknown part field */

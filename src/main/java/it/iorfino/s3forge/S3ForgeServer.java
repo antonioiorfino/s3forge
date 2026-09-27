@@ -21,7 +21,6 @@ final class S3ForgeServer {
 
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(config.port()), 0);
-        // Java 21: un virtual thread per richiesta
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", new Router(store, config));
         server.start();
