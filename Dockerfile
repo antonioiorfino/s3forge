@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: build with Maven
 # ---------------------------------------------------------------------------
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-25 AS build
 
 WORKDIR /src
 
@@ -16,7 +16,7 @@ RUN mvn -B -q clean package -DskipTests
 # ---------------------------------------------------------------------------
 # Stage 2: build a minimal runtime image with jlink
 # ---------------------------------------------------------------------------
-FROM eclipse-temurin:21-jdk-alpine AS jlink
+FROM eclipse-temurin:25-jdk-alpine AS jlink
 
 WORKDIR /work
 COPY --from=build /src/target/s3forge.jar /work/s3forge.jar
@@ -24,7 +24,7 @@ COPY --from=build /src/target/s3forge.jar /work/s3forge.jar
 # Analyze the jar and produce a runtime with only the required modules.
 RUN jdeps \
       --ignore-missing-deps \
-      --multi-release 21 \
+      --multi-release 25 \
       --print-module-deps \
       --class-path /work/s3forge.jar \
       /work/s3forge.jar > /work/modules.txt \

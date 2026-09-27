@@ -3,7 +3,7 @@
 [![CI](https://github.com/antonioiorfino/s3forge/actions/workflows/ci.yml/badge.svg)](https://github.com/antonioiorfino/s3forge/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://github.com/antonioiorfino/s3forge/releases/tag/v0.2.0)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
+[![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 
 **S3Forge** is an embedded S3 mock server written in **pure Java**, with
 **zero framework dependencies**. It implements a practical subset of the
@@ -190,7 +190,7 @@ The image uses a `jlink`-generated runtime, so the final layer is under
 
 Requirements:
 
-- JDK 21 or later
+- JDK 25 or later
 - Maven 3.9 or later
 
 Build:

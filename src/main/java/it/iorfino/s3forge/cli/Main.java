@@ -52,6 +52,8 @@ public final class Main {
             return;
         }
 
+        Banner.print(System.out);
+
         int port = Integer.parseInt(opts.getOrDefault("port", "8001"));
         String fsPath = opts.get("file-system");
         String vhost = opts.get("virtual-host");
