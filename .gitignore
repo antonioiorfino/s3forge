@@ -28,3 +28,8 @@ Thumbs.db
 
 # Docker
 s3data/
+
+# JMH benchmark outputs
+put-get.json
+list.json
+mixed-t*.json
